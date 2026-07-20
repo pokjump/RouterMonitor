@@ -1,0 +1,17 @@
+## Build output
+bin/
+obj/
+gotowa-aplikacja/
+
+## VS / VS Code / Rider
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+*.DotSettings.user
+
+## Misc
+*.log

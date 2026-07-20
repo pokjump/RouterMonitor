@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RouterMonitor.Console/RouterMonitor.Console.csproj" />
+    <Project Path="src/RouterMonitor.Core/RouterMonitor.Core.csproj" />
+    <Project Path="src/RouterMonitor.Wpf/RouterMonitor.Wpf.csproj" />
+  </Folder>
+</Solution>
