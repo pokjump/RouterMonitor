@@ -8,7 +8,7 @@ public sealed record AppSettings
     public string BaseAddress { get; init; } = "http://192.168.1.1";
     public string Username { get; init; } = "admin";
     public string Password { get; init; } = "admin_netia";
-    public int PollIntervalSeconds { get; init; } = 1;
+    public int PollIntervalSeconds { get; init; } = 30;
     public string? RawDumpDirectory { get; init; }
 
     private static string AppDataDirectory => Path.Combine(
@@ -55,7 +55,7 @@ public sealed record AppSettings
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Non-fatal — the app just runs with in-memory defaults for this session.
+            // Non-fatal - the app just runs with in-memory defaults for this session.
         }
     }
 }

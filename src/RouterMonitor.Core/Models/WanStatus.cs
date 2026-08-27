@@ -5,7 +5,7 @@ namespace RouterMonitor.Core.Models;
 /// <summary>
 /// WAN/DSL snapshot. Built from the overview page's "Połączenie internetowe" and "Połączenie
 /// DSL" sub-sections (there's no separate, more detailed /ui/dboard/wan page on this firmware
-/// without an edit-form query string) — see AdbVV5822Provider.GetWanStatusAsync.
+/// without an edit-form query string) - see AdbVV5822Provider.GetWanStatusAsync.
 /// </summary>
 public sealed record WanStatus(IReadOnlyList<InfoSection> Sections)
 {

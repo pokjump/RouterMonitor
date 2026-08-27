@@ -11,6 +11,7 @@ public sealed class RouterHttpClient : IDisposable
     private readonly HttpClient _http;
     private readonly ILogger _logger;
     private readonly int _maxRetries;
+    private readonly SemaphoreSlim _requestGate = new(1, 1);
 
     public Uri BaseAddress { get; }
 
@@ -32,6 +33,11 @@ public sealed class RouterHttpClient : IDisposable
             BaseAddress = baseAddress,
             Timeout = timeout,
         };
+
+        // The router's embedded web server accepts a request on a fresh TCP connection but
+        // hangs (until client timeout) on a second request reused over the same keep-alive
+        // connection. Force a new connection per request rather than pooling one.
+        _http.DefaultRequestHeaders.ConnectionClose = true;
     }
 
     public async Task<string> GetHtmlAsync(string path, CancellationToken cancellationToken = default)
@@ -50,24 +56,36 @@ public sealed class RouterHttpClient : IDisposable
 
     private async Task<HttpResponseMessage> SendWithRetryAsync(Func<HttpRequestMessage> requestFactory, CancellationToken cancellationToken)
     {
-        for (var attempt = 1; ; attempt++)
+        // The router's embedded web server can't handle a second request while one is still
+        // in flight - a concurrent GET/POST from another caller (e.g. the polling loop and the
+        // view model's own startup calls) hangs until timeout instead of queuing. Serialize
+        // every request through this client so only one is ever in flight at a time.
+        await _requestGate.WaitAsync(cancellationToken);
+        try
         {
-            try
+            for (var attempt = 1; ; attempt++)
             {
-                using var request = requestFactory();
-                var response = await _http.SendAsync(request, cancellationToken);
-                response.EnsureSuccessStatusCode();
-                return response;
-            }
-            catch (Exception ex) when (IsRetryable(ex, cancellationToken))
-            {
-                if (attempt >= _maxRetries)
-                    throw new RouterCommunicationException($"Żądanie HTTP nie powiodło się po {_maxRetries} próbach.", ex);
+                try
+                {
+                    using var request = requestFactory();
+                    var response = await _http.SendAsync(request, cancellationToken);
+                    response.EnsureSuccessStatusCode();
+                    return response;
+                }
+                catch (Exception ex) when (IsRetryable(ex, cancellationToken))
+                {
+                    if (attempt >= _maxRetries)
+                        throw new RouterCommunicationException($"Żądanie HTTP nie powiodło się po {_maxRetries} próbach.", ex);
 
-                var delay = TimeSpan.FromMilliseconds(300 * Math.Pow(2, attempt - 1));
-                _logger.LogWarning(ex, "Żądanie HTTP nieudane (próba {Attempt}/{Max}), ponawiam za {DelayMs} ms", attempt, _maxRetries, delay.TotalMilliseconds);
-                await Task.Delay(delay, cancellationToken);
+                    var delay = TimeSpan.FromMilliseconds(300 * Math.Pow(2, attempt - 1));
+                    _logger.LogWarning(ex, "Żądanie HTTP nieudane (próba {Attempt}/{Max}), ponawiam za {DelayMs} ms", attempt, _maxRetries, delay.TotalMilliseconds);
+                    await Task.Delay(delay, cancellationToken);
+                }
             }
+        }
+        finally
+        {
+            _requestGate.Release();
         }
     }
 
@@ -79,7 +97,11 @@ public sealed class RouterHttpClient : IDisposable
             _ => false,
         };
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _http.Dispose();
+        _requestGate.Dispose();
+    }
 }
 
 public sealed class RouterCommunicationException(string message, Exception? inner) : Exception(message, inner);

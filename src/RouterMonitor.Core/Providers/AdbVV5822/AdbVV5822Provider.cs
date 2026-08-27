@@ -9,7 +9,7 @@ namespace RouterMonitor.Core.Providers.AdbVV5822;
 
 /// <summary>
 /// IRouterProvider implementation for the ADB VV5822 ("epicentro" panel), firmware
-/// VV5822_NETIA_7.6.0.0010. The panel has no JSON/AJAX API — every page is server-rendered
+/// VV5822_NETIA_7.6.0.0010. The panel has no JSON/AJAX API - every page is server-rendered
 /// HTML parsed with <see cref="InfoFieldParser"/>. Login is a plain-text form POST (no
 /// hashing/nonce in this firmware), tracked via a cookie session.
 /// </summary>
@@ -20,6 +20,7 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
     private readonly AdbVV5822Options _options;
     private readonly RouterHttpClient _http;
     private readonly ILogger<AdbVV5822Provider> _logger;
+    private readonly SemaphoreSlim _sessionLock = new(1, 1);
     private bool _loggedIn;
 
     public AdbVV5822Provider(AdbVV5822Options options, ILogger<AdbVV5822Provider> logger)
@@ -63,7 +64,7 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
         if (LooksLikeLoginPage(resultHtml))
         {
             throw new InvalidOperationException(
-                "Logowanie nie powiodło się — po POST nadal widoczna jest strona logowania. " +
+                "Logowanie nie powiodło się - po POST nadal widoczna jest strona logowania. " +
                 "Sprawdź hasło/login oraz zrzut 'login-result' w trybie surowego dumpu.");
         }
 
@@ -92,7 +93,7 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
         var devices = await GetHomenetDevicesAsync(cancellationToken);
 
         // /ui/dboard/homenet lists every device the router has ever seen, including ones that
-        // are currently offline (its own "Połączony: Nie" field) — only surface devices that
+        // are currently offline (its own "Połączony: Nie" field) - only surface devices that
         // are actually on the network right now. Keep IsConnected == null (couldn't parse the
         // field) rather than drop it, so a parsing miss fails open.
         return devices.Where(d => d.IsConnected != false).ToList();
@@ -112,8 +113,8 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
     {
         _logger.LogInformation("Wysyłanie żądania ponownego uruchomienia routera...");
 
-        // The reboot page only renders in "advanced mode" — a session-wide flag toggled by
-        // this query param (see the "Ustawienia zaawansowane" tab) — so it must be set first.
+        // The reboot page only renders in "advanced mode" - a session-wide flag toggled by
+        // this query param (see the "Ustawienia zaawansowane" tab) - so it must be set first.
         await GetHtmlEnsureSessionAsync("/ui/dboard?level=2", cancellationToken);
 
         var rebootPageHtml = await GetHtmlEnsureSessionAsync(_options.RebootPath, cancellationToken);
@@ -133,9 +134,9 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
         }
         catch (RouterCommunicationException ex)
         {
-            // The router legitimately drops the connection as it restarts — that's the expected
+            // The router legitimately drops the connection as it restarts - that's the expected
             // outcome of a successful reboot request, not a failure to report to the caller.
-            _logger.LogInformation(ex, "Połączenie przerwane w trakcie restartu routera — oczekiwane zachowanie.");
+            _logger.LogInformation(ex, "Połączenie przerwane w trakcie restartu routera - oczekiwane zachowanie.");
         }
         finally
         {
@@ -150,13 +151,13 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
 
         var blocks = HomenetPageParser.ParseDeviceBlocks(html);
         if (blocks.Count == 0)
-            _logger.LogWarning("Strona {Path} nie zwróciła żadnych urządzeń — sprawdź zrzut 'homenet'.", _options.HomenetPath);
+            _logger.LogWarning("Strona {Path} nie zwróciła żadnych urządzeń - sprawdź zrzut 'homenet'.", _options.HomenetPath);
 
         var devices = new List<NetworkDevice>();
         foreach (var block in blocks)
         {
             // The page's own top-level panel header (e.g. "Sieć domowa") parses as an empty
-            // section — expected, not a warning-worthy anomaly; only real device panels have fields.
+            // section - expected, not a warning-worthy anomaly; only real device panels have fields.
             if (block.Section.Fields.Count == 0)
                 continue;
 
@@ -168,7 +169,7 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
 
     public async Task<WanStatus> GetWanStatusAsync(CancellationToken cancellationToken = default)
     {
-        // No standalone WAN page (see AdbVV5822Options) — WAN facts live in the overview's
+        // No standalone WAN page (see AdbVV5822Options) - WAN facts live in the overview's
         // "Połączenie internetowe" sub-section, found generically via WanStatus.Find(...).
         var sections = await GetSectionsAsync(_options.OverviewPath, "overview", cancellationToken);
         return new WanStatus(sections);
@@ -176,7 +177,7 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
 
     public async Task<WifiStatus> GetWifiAsync(CancellationToken cancellationToken = default)
     {
-        // No standalone WiFi page (see AdbVV5822Options) — each band is its own sub-section
+        // No standalone WiFi page (see AdbVV5822Options) - each band is its own sub-section
         // of the overview page, titled e.g. "WiFi-1.1 (2.4GHz)" / "WiFi-2.1 (5GHz)".
         var sections = await GetSectionsAsync(_options.OverviewPath, "overview", cancellationToken);
         var bands = sections
@@ -194,23 +195,59 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
 
         var sections = InfoFieldParser.ParseSections(html);
         if (sections.Count == 0)
-            _logger.LogWarning("Strona {Path} nie zwróciła żadnych sekcji .infoField/.panel — sprawdź zrzut '{DumpName}'.", path, dumpName);
+            _logger.LogWarning("Strona {Path} nie zwróciła żadnych sekcji .infoField/.panel - sprawdź zrzut '{DumpName}'.", path, dumpName);
 
         return sections;
     }
 
     private async Task<string> GetHtmlEnsureSessionAsync(string path, CancellationToken cancellationToken)
     {
-        if (!_loggedIn)
-            await LoginAsync(cancellationToken);
+        await EnsureLoggedInAsync(cancellationToken);
 
         var html = await _http.GetHtmlAsync(path, cancellationToken);
         if (!LooksLikeLoginPage(html))
             return html;
 
-        _logger.LogWarning("Sesja wygasła podczas pobierania {Path} — logowanie ponowne.", path);
-        await LoginAsync(cancellationToken);
+        _logger.LogWarning("Sesja wygasła podczas pobierania {Path} - logowanie ponowne.", path);
+        await ForceLoginAsync(cancellationToken);
         return await _http.GetHtmlAsync(path, cancellationToken);
+    }
+
+    /// <summary>
+    /// Serializes login attempts through <see cref="_sessionLock"/> - the polling loop and the
+    /// view model's own startup calls (e.g. loading inactive devices) both hit this provider
+    /// concurrently, and two simultaneous LoginAsync calls race on the router's single session,
+    /// corrupting it. Double-checks <see cref="_loggedIn"/> after acquiring the lock so a caller
+    /// that lost the race doesn't log in again unnecessarily.
+    /// </summary>
+    private async Task EnsureLoggedInAsync(CancellationToken cancellationToken)
+    {
+        if (_loggedIn)
+            return;
+
+        await _sessionLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_loggedIn)
+                await LoginAsync(cancellationToken);
+        }
+        finally
+        {
+            _sessionLock.Release();
+        }
+    }
+
+    private async Task ForceLoginAsync(CancellationToken cancellationToken)
+    {
+        await _sessionLock.WaitAsync(cancellationToken);
+        try
+        {
+            await LoginAsync(cancellationToken);
+        }
+        finally
+        {
+            _sessionLock.Release();
+        }
     }
 
     private static bool LooksLikeLoginPage(string html)
@@ -228,5 +265,9 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
         _logger.LogDebug("Zapisano surowy zrzut HTML: {Path}", path);
     }
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _http.Dispose();
+        _sessionLock.Dispose();
+    }
 }

@@ -18,7 +18,7 @@ public sealed record AdbVV5822Options
 
     public string HomenetPath { get; init; } = "/ui/dboard/homenet";
 
-    /// <summary>Reboot confirmation page — only renders once the session is in "advanced mode" (see AdbVV5822Provider.RebootAsync).</summary>
+    /// <summary>Reboot confirmation page - only renders once the session is in "advanced mode" (see AdbVV5822Provider.RebootAsync).</summary>
     public string RebootPath { get; init; } = "/ui/dboard/system/reboot?backto=home";
 
     public string RebootActionPath { get; init; } = "/ui/dboard/system/reboot/action";
@@ -26,7 +26,7 @@ public sealed record AdbVV5822Options
     // No separate WifiPath/WanPath/LanPath: on the live firmware, /ui/dboard/wifi and
     // /ui/dboard/wan without an "?edit=...&if=..." query just re-render the same overview
     // page (confirmed by diffing live responses). WAN/WiFi/LAN data is instead read from the
-    // sub-sections that OverviewPath's page splits itself into — see InfoFieldParser.
+    // sub-sections that OverviewPath's page splits itself into - see InfoFieldParser.
 
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(10);
 

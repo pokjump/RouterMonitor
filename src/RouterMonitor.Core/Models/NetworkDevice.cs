@@ -4,7 +4,7 @@ namespace RouterMonitor.Core.Models;
 
 /// <summary>
 /// One device panel from /ui/dboard/homenet ("Informacje o urządzeniu"). The homenet page
-/// lists every device the router has ever seen, not just those currently online — each has
+/// lists every device the router has ever seen, not just those currently online - each has
 /// its own "Połączony:" (Tak/Nie) field for that. Use <see cref="IsConnected"/> to filter for
 /// devices that are actually on the network right now. <see cref="HostId"/> identifies the
 /// device for the router's own delete action and is only populated when parsed from the

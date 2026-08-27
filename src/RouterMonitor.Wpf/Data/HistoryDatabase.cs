@@ -117,7 +117,7 @@ public sealed class HistoryDatabase
         {
             if (string.IsNullOrWhiteSpace(device.MacAddress))
             {
-                _logger.LogWarning("Pominięto urządzenie '{Name}' bez adresu MAC — nie da się śledzić jego historii.", device.Name);
+                _logger.LogWarning("Pominięto urządzenie '{Name}' bez adresu MAC - nie da się śledzić jego historii.", device.Name);
                 continue;
             }
 
@@ -165,17 +165,6 @@ public sealed class HistoryDatabase
 
         await transaction.CommitAsync(cancellationToken);
         return newMacs;
-    }
-
-    /// <summary>Whether any device has ever been recorded — used to suppress "new device" alerts on the very first poll.</summary>
-    public async Task<bool> HasAnyKnownDeviceAsync(CancellationToken cancellationToken = default)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(1) FROM KnownDevices";
-        return (long)(await command.ExecuteScalarAsync(cancellationToken))! > 0;
     }
 
     /// <summary>Distinct devices seen within [from, to), for a "who was online yesterday" view.</summary>

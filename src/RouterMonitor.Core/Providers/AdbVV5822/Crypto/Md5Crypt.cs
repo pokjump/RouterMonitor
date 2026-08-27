@@ -6,7 +6,7 @@ namespace RouterMonitor.Core.Providers.AdbVV5822.Crypto;
 /// <summary>
 /// Port of the router's own /js/md5_crypt.js (itself a JS port of FreeBSD libcrypt's md5_crypt),
 /// used only because the ADB "epicentro" login form hashes the password client-side before
-/// POSTing — despite firmware VV5822_NETIA_7.6.0.0010 having no server-side TLS, the login
+/// POSTing - despite firmware VV5822_NETIA_7.6.0.0010 having no server-side TLS, the login
 /// form still HMACs a $1$-style MD5 crypt digest with a per-page nonce. This must match the
 /// JS bit-for-bit or the router will reject the login. See AdbVV5822LoginTests for reference
 /// vectors captured directly from the live router's JS.
@@ -60,7 +60,7 @@ internal static class Md5Crypt
             hash = md5.ComputeHash(round.ToArray());
         }
 
-        // hash += hash.charAt(5) — extend the 16-byte digest with a 17th byte copied from index 5.
+        // hash += hash.charAt(5) - extend the 16-byte digest with a 17th byte copied from index 5.
         var extended = new byte[17];
         hash.CopyTo(extended, 0);
         extended[16] = hash[5];
@@ -93,7 +93,7 @@ internal static class Md5Crypt
 
     /// <summary>
     /// The router's md5.js runs with chrsz=8 (one byte per JS char, truncated to 8 bits via
-    /// `& mask`), so each character maps to exactly one byte regardless of code point — the
+    /// `& mask`), so each character maps to exactly one byte regardless of code point - the
     /// same semantics as Latin-1/code-page-437-style byte truncation, not UTF-8.
     /// </summary>
     private static byte[] ToBytes(string s)

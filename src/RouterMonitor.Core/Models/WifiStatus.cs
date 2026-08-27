@@ -10,7 +10,7 @@ public sealed record WifiBand(string Title, string? Ssid, string? Encryption, st
         var ssid = LabelMatcher.FindByAnyContains(section.Fields, "ssid", "nazwa sieci");
         var encryption = LabelMatcher.FindByAnyContains(section.Fields, "ochrona", "szyfrowanie", "encryption", "security", "zabezpiecz");
 
-        // The band's own on/off state isn't a separate labeled field — it's the value of the
+        // The band's own on/off state isn't a separate labeled field - it's the value of the
         // section's own title field (e.g. label "WiFi-1.1 (2.4GHz)" -> value "Aktywne"), since
         // that field both names the section and reports its status. Fall back to a labeled
         // "stan"/"status" field in case a firmware variant does expose one separately.

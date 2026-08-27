@@ -14,10 +14,10 @@ namespace RouterMonitor.Core.Parsing;
 ///  - &lt;label class="panel"&gt;Nazwa&lt;/label&gt;, a standalone heading for a whole page
 ///    area (e.g. "Urządzenie", "Serwisy", or one "Informacje o urządzeniu" block per device
 ///    on the homenet page). Note that the *wrapping* div/img/hr around such a heading often
-///    also carries a "panel" class token — only the &lt;label&gt; element counts as a header.
+///    also carries a "panel" class token - only the &lt;label&gt; element counts as a header.
 ///  - A field whose own &lt;label&gt; carries an additional "title" class, e.g.
 ///    &lt;div class="infoField"&gt;&lt;label class="title"&gt;Połączenie DSL:&lt;/label&gt;...
-///    This both contributes its own label/value pair *and* starts a new sub-section — the
+///    This both contributes its own label/value pair *and* starts a new sub-section - the
 ///    dboard overview page packs WAN/DSL/WiFi-2.4/WiFi-5/LAN/ports/phone-lines all inside one
 ///    "Urządzenie" panel, separated only by these title-labeled fields and &lt;hr/&gt;s.
 /// </summary>
@@ -56,7 +56,7 @@ public static class InfoFieldParser
                 continue;
 
             // Later duplicate labels overwrite earlier ones (e.g. "SSID" appears once per WiFi
-            // band on the overview page) — use ParseSections when that ambiguity matters.
+            // band on the overview page) - use ParseSections when that ambiguity matters.
             result[label] = value;
         }
 

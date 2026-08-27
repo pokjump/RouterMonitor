@@ -12,7 +12,7 @@ namespace RouterMonitor.Core.Providers.AdbVV5822.Crypto;
 /// </summary>
 internal static class LoginHash
 {
-    /// <summary>HMAC-SHA256(message, key) as lowercase hex — matches CryptoJS.HmacSHA256(message, key).toString().</summary>
+    /// <summary>HMAC-SHA256(message, key) as lowercase hex - matches CryptoJS.HmacSHA256(message, key).toString().</summary>
     public static string HmacSha256Hex(string message, string key)
     {
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));

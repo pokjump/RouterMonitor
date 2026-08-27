@@ -12,7 +12,7 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 2. Once logged in, `RouterHttpClient` fetches the panel's HTML pages (device summary, home network, etc.), retrying failed requests with exponential backoff to work around the router's flaky connection.
 3. Each page is parsed with `InfoFieldParser`/`HomenetPageParser` (using HtmlAgilityPack). Since the panel has no structured API, everything - WAN status, Wi-Fi info, connected devices - is read straight out of the rendered HTML labels and values.
 4. In the WPF app, `PollingService` runs this login-fetch-parse cycle on a timer in the background, pushes the latest snapshot to the UI (`MainViewModel`), and writes it to a local SQLite database (`HistoryDatabase`) for the transfer chart and for spotting devices that weren't seen before.
-5. A newly seen device triggers a Windows tray notification (`TrayIconService`); the app is meant to sit in the tray between polls rather than stay open as a window.
+5. `PollingService` compares each poll's device list against the previous one; any device that joins or drops off the network triggers a Windows tray notification (`TrayIconService`) - not just devices never seen before. The app starts hidden in the tray (no window is shown at startup) and registers itself to launch at Windows sign-in.
 6. The console tool (`RouterMonitor.Console`) skips the UI and history entirely and just runs one login-fetch-print cycle - useful for scripting or a quick manual check.
 
 ## What the app does
@@ -20,8 +20,8 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 - Shows WAN/DSL connection status, IP addresses, Wi-Fi (SSID, security) and basic device info.
 - Lists devices connected to the home network (name, MAC address, IP address, interface).
 - Periodically polls the router and stores download/upload transfer history in a local SQLite database, shown as a chart.
-- Detects new, previously unseen devices on the network and notifies via a system tray balloon.
-- Runs in the background as a Windows system tray icon.
+- Notifies via a system tray balloon whenever any device joins or leaves the network (not just the first time an unknown device shows up).
+- Starts hidden in the system tray and launches automatically at Windows sign-in.
 
 ## Repository layout
 
@@ -42,7 +42,9 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 dotnet run --project src/RouterMonitor.Wpf
 ```
 
-On first run the app creates `%AppData%\RouterMonitor\settings.json` with default values (router address, username, password, poll interval). You need to fill in the login details for **your own** router there - the default values in the code are just the vendor's/ISP's factory defaults, not a universal password.
+On first run the app creates `%AppData%\RouterMonitor\settings.json` with default values (router address, username, password, poll interval - 30 seconds by default, floored at 5 to avoid hammering the router). You need to fill in the login details for **your own** router there - the default values in the code are just the vendor's/ISP's factory defaults, not a universal password.
+
+The app starts hidden in the system tray (no window pops up) and adds itself to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` so it launches automatically at sign-in; use the tray icon's "Pokaż" entry to open the window, and "Zakończ" to exit (which also removes the app from the tray, but not from the Run key - delete the `RouterMonitor` value there if you want to stop it from launching at startup).
 
 ### Console tool
 

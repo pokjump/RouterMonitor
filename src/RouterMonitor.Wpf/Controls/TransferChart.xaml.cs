@@ -9,7 +9,7 @@ namespace RouterMonitor.Wpf.Controls;
 
 /// <summary>
 /// Minimal dependency-free line chart: two auto-scaled polylines (download/upload) redrawn on
-/// data or size change. Deliberately hand-rolled instead of pulling in a charting library —
+/// data or size change. Deliberately hand-rolled instead of pulling in a charting library -
 /// the requirement is a simple transfer-over-time sparkline, not an interactive chart.
 /// </summary>
 public partial class TransferChart : System.Windows.Controls.UserControl

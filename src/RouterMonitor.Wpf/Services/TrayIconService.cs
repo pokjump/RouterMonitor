@@ -41,9 +41,9 @@ public sealed class TrayIconService : IDisposable
         _mainWindow.Activate();
     }
 
-    public void ShowNewDeviceAlert(string message)
+    public void ShowDeviceAlert(string title, string message)
     {
-        _notifyIcon.BalloonTipTitle = "Nowe urządzenie w sieci";
+        _notifyIcon.BalloonTipTitle = title;
         _notifyIcon.BalloonTipText = message;
         _notifyIcon.ShowBalloonTip(6000);
     }

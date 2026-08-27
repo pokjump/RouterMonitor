@@ -20,10 +20,13 @@ public sealed class PollingService : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
     private bool _isFirstPoll = true;
+    private readonly Dictionary<string, NetworkDevice> _onlineDevices = new();
+    private readonly SemaphoreSlim _pollGate = new(1, 1);
 
     public event Action<RouterOverview, IReadOnlyList<NetworkDevice>>? DataUpdated;
     public event Action<Exception>? PollFailed;
-    public event Action<IReadOnlyList<NetworkDevice>>? NewDevicesDetected;
+    public event Action<IReadOnlyList<DeviceStatusChange>>? DevicesConnected;
+    public event Action<IReadOnlyList<NetworkDevice>>? DevicesDisconnected;
 
     public PollingService(IRouterProvider provider, HistoryDatabase db, ILogger<PollingService> logger, TimeSpan interval)
     {
@@ -42,14 +45,39 @@ public sealed class PollingService : IAsyncDisposable
         _loopTask = RunLoopAsync(_cts.Token);
     }
 
+    /// <summary>
+    /// Polls immediately instead of waiting for the next scheduled tick - used by the UI's
+    /// manual "retry" action. Guarded against overlapping with the scheduled loop's own poll.
+    /// </summary>
+    public async Task PollNowAsync(CancellationToken cancellationToken = default)
+    {
+        await _pollGate.WaitAsync(cancellationToken);
+        try
+        {
+            await PollOnceAsync(cancellationToken);
+        }
+        finally
+        {
+            _pollGate.Release();
+        }
+    }
+
     private async Task RunLoopAsync(CancellationToken cancellationToken)
     {
-        _isFirstPoll = !await _db.HasAnyKnownDeviceAsync(cancellationToken);
+        _isFirstPoll = true;
 
         using var timer = new PeriodicTimer(_interval);
         while (true)
         {
-            await PollOnceAsync(cancellationToken);
+            await _pollGate.WaitAsync(cancellationToken);
+            try
+            {
+                await PollOnceAsync(cancellationToken);
+            }
+            finally
+            {
+                _pollGate.Release();
+            }
 
             if (cancellationToken.IsCancellationRequested)
                 return;
@@ -64,6 +92,43 @@ public sealed class PollingService : IAsyncDisposable
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Diffs this poll's device list against the online set from the previous poll and raises
+    /// connect/disconnect events accordingly. Seeds the baseline on the first poll of the run
+    /// instead of comparing against an empty set, so devices already online at startup aren't
+    /// reported as newly connected.
+    /// </summary>
+    private void RaiseConnectivityChanges(IReadOnlyList<NetworkDevice> devices, IReadOnlyList<string> newMacs)
+    {
+        var currentByMac = devices.Where(d => d.MacAddress is not null).ToDictionary(d => d.MacAddress!, d => d);
+
+        if (_isFirstPoll)
+        {
+            _onlineDevices.Clear();
+            foreach (var (mac, device) in currentByMac)
+                _onlineDevices[mac] = device;
+            return;
+        }
+
+        var connected = new List<DeviceStatusChange>();
+        foreach (var (mac, device) in currentByMac)
+        {
+            if (!_onlineDevices.ContainsKey(mac))
+                connected.Add(new DeviceStatusChange(device, IsNew: newMacs.Contains(mac)));
+            _onlineDevices[mac] = device;
+        }
+
+        var disconnectedMacs = _onlineDevices.Keys.Except(currentByMac.Keys).ToList();
+        var disconnected = disconnectedMacs.Select(mac => _onlineDevices[mac]).ToList();
+        foreach (var mac in disconnectedMacs)
+            _onlineDevices.Remove(mac);
+
+        if (connected.Count > 0)
+            DevicesConnected?.Invoke(connected);
+        if (disconnected.Count > 0)
+            DevicesDisconnected?.Invoke(disconnected);
     }
 
     private async Task PollOnceAsync(CancellationToken cancellationToken)
@@ -81,15 +146,7 @@ public sealed class PollingService : IAsyncDisposable
             var newMacs = await _db.RecordDeviceSightingsAsync(now, devices, cancellationToken);
 
             DataUpdated?.Invoke(overview, devices);
-
-            // Suppress alerts on the app's very first-ever poll — otherwise every device
-            // already on the household network would be reported as "new".
-            if (newMacs.Count > 0 && !_isFirstPoll)
-            {
-                var newDevices = devices.Where(d => d.MacAddress is not null && newMacs.Contains(d.MacAddress)).ToList();
-                if (newDevices.Count > 0)
-                    NewDevicesDetected?.Invoke(newDevices);
-            }
+            RaiseConnectivityChanges(devices, newMacs);
 
             _isFirstPoll = false;
         }
@@ -116,5 +173,9 @@ public sealed class PollingService : IAsyncDisposable
         }
 
         _cts?.Dispose();
+        _pollGate.Dispose();
     }
 }
+
+/// <summary>A device seen online this poll that wasn't online the previous poll; <see cref="IsNew"/> marks a MAC never recorded before.</summary>
+public sealed record DeviceStatusChange(NetworkDevice Device, bool IsNew);

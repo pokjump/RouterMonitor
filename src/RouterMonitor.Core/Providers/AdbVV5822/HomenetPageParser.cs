@@ -7,9 +7,9 @@ namespace RouterMonitor.Core.Providers.AdbVV5822;
 /// <summary>
 /// Parses /ui/dboard/homenet device blocks, including the "hostid" the router uses to
 /// identify a device for the delete action (<c>?action=delhost&amp;hostid=N</c>). Each device
-/// panel is a <c>&lt;div class="homenetInfo" id="tipHostN"&gt;</c> — the id's numeric suffix
+/// panel is a <c>&lt;div class="homenetInfo" id="tipHostN"&gt;</c> - the id's numeric suffix
 /// *is* the hostid, present for every device (active or not), whereas the delete link itself
-/// only renders for currently-inactive devices — so reading it off the wrapper div id is more
+/// only renders for currently-inactive devices - so reading it off the wrapper div id is more
 /// reliable than scraping the link.
 /// </summary>
 internal static class HomenetPageParser

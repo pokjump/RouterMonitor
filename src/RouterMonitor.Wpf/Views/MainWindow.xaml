@@ -46,6 +46,7 @@
                 <TextBlock Text="{Binding StatusMessage}" Foreground="White" VerticalAlignment="Center" />
                 <TextBlock Text=" · ostatnia aktualizacja: " Foreground="#9CA3AF" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding LastUpdatedText}" Foreground="White" VerticalAlignment="Center" />
+                <Button Content="Ponów teraz" Padding="10,2" Margin="14,0,0,0" Command="{Binding RetryNowCommand}" />
             </StackPanel>
         </Border>
 
@@ -167,7 +168,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Button Content="Uruchom ponownie router" Padding="12,6" Command="{Binding RebootRouterCommand}"
                                     Background="#EF4444" Foreground="White" BorderThickness="0" />
-                            <TextBlock Text="Router zrestartuje się natychmiast — internet i WiFi będą niedostępne przez chwilę."
+                            <TextBlock Text="Router zrestartuje się natychmiast - internet i WiFi będą niedostępne przez chwilę."
                                        Foreground="#6B7280" FontSize="11" VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

@@ -15,7 +15,7 @@ public interface IRouterProvider
     /// <summary>Devices currently on the network (excludes ones the router only remembers but that are offline).</summary>
     Task<IReadOnlyList<NetworkDevice>> GetDevicesAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Every device the router has ever seen, connected or not — for device-list management/cleanup.</summary>
+    /// <summary>Every device the router has ever seen, connected or not - for device-list management/cleanup.</summary>
     Task<IReadOnlyList<NetworkDevice>> GetAllKnownDevicesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Removes a device from the router's known-devices list (requires <see cref="NetworkDevice.HostId"/>).</summary>

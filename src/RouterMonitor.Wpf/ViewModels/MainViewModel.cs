@@ -31,6 +31,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string statusMessage = "Łączenie z routerem...";
     [ObservableProperty] private string lastUpdatedText = "–";
     [ObservableProperty] private bool isOnline;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RetryNowCommand))]
+    private bool isRetrying;
     [ObservableProperty] private DateTime historyDate = DateTime.Today.AddDays(-1);
 
     public ObservableCollection<NetworkDevice> Devices { get; } = [];
@@ -52,7 +55,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         _polling.DataUpdated += OnDataUpdated;
         _polling.PollFailed += OnPollFailed;
-        _polling.NewDevicesDetected += OnNewDevicesDetected;
+        _polling.DevicesConnected += OnDevicesConnected;
+        _polling.DevicesDisconnected += OnDevicesDisconnected;
 
         _ = LoadHistoryAsync();
         _ = LoadInactiveDevicesAsync();
@@ -108,20 +112,52 @@ public partial class MainViewModel : ObservableObject, IDisposable
         });
     }
 
-    private void OnNewDevicesDetected(IReadOnlyList<NetworkDevice> newDevices)
+    private void OnDevicesConnected(IReadOnlyList<DeviceStatusChange> changes)
     {
         System.Windows.Application.Current!.Dispatcher.Invoke(() =>
         {
-            foreach (var device in newDevices)
+            foreach (var (device, isNew) in changes)
             {
-                var message = $"{device.Name} ({device.MacAddress}) dołączył do sieci — IP {device.IpAddress ?? "?"}.";
-                _tray.ShowNewDeviceAlert(message);
+                var message = $"{device.Name} ({device.MacAddress}) dołączył do sieci - IP {device.IpAddress ?? "?"}.";
+                _tray.ShowDeviceAlert(isNew ? "Nowe urządzenie w sieci" : "Urządzenie połączone", message);
                 _logger.LogWarning(
-                    "Nowe urządzenie w sieci: {Name} MAC={Mac} IP={Ip} Połączenie={Connection}",
-                    device.Name, device.MacAddress, device.IpAddress, device.ConnectionType);
+                    "Urządzenie połączone{New}: {Name} MAC={Mac} IP={Ip} Połączenie={Connection}",
+                    isNew ? " (nowe)" : "", device.Name, device.MacAddress, device.IpAddress, device.ConnectionType);
             }
         });
     }
+
+    private void OnDevicesDisconnected(IReadOnlyList<NetworkDevice> devices)
+    {
+        System.Windows.Application.Current!.Dispatcher.Invoke(() =>
+        {
+            foreach (var device in devices)
+            {
+                var message = $"{device.Name} ({device.MacAddress}) rozłączył się z siecią.";
+                _tray.ShowDeviceAlert("Urządzenie rozłączone", message);
+                _logger.LogWarning(
+                    "Urządzenie rozłączone: {Name} MAC={Mac} Połączenie={Connection}",
+                    device.Name, device.MacAddress, device.ConnectionType);
+            }
+        });
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRetryNow))]
+    private async Task RetryNowAsync()
+    {
+        IsRetrying = true;
+        StatusMessage = "Ponawianie połączenia...";
+        try
+        {
+            await _polling.PollNowAsync();
+        }
+        finally
+        {
+            IsRetrying = false;
+        }
+    }
+
+    private bool CanRetryNow() => !IsRetrying;
 
     [RelayCommand]
     private async Task LoadHistoryAsync()
@@ -152,7 +188,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             StatusMessage = "Wysyłanie żądania ponownego uruchomienia...";
             await _provider.RebootAsync();
-            StatusMessage = "Router uruchamia się ponownie — połączenie wróci za chwilę.";
+            StatusMessage = "Router uruchamia się ponownie - połączenie wróci za chwilę.";
             _logger.LogWarning("Router został zrestartowany na żądanie użytkownika.");
         }
         catch (Exception ex)
@@ -235,7 +271,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         ManageStatusMessage = failures == 0
             ? $"Usunięto {selected.Count} urządzeń."
-            : $"Usunięto {selected.Count - failures} z {selected.Count} — {failures} nie powiodło się (patrz log).";
+            : $"Usunięto {selected.Count - failures} z {selected.Count} - {failures} nie powiodło się (patrz log).";
 
         await LoadInactiveDevicesAsync();
     }
@@ -244,6 +280,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         _polling.DataUpdated -= OnDataUpdated;
         _polling.PollFailed -= OnPollFailed;
-        _polling.NewDevicesDetected -= OnNewDevicesDetected;
+        _polling.DevicesConnected -= OnDevicesConnected;
+        _polling.DevicesDisconnected -= OnDevicesDisconnected;
     }
 }

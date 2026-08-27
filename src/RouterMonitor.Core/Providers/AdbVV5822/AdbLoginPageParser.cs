@@ -42,7 +42,7 @@ internal static class AdbLoginPageParser
         if (node is null)
         {
             throw new InvalidOperationException(
-                $"Brak oczekiwanego pola '{name}' na stronie logowania — firmware mógł się zmienić. " +
+                $"Brak oczekiwanego pola '{name}' na stronie logowania - firmware mógł się zmienić. " +
                 "Sprawdź surowy zrzut HTML strony /ui/login.");
         }
 

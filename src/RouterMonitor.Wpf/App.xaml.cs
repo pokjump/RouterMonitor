@@ -23,6 +23,7 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        StartupRegistration.EnsureRegistered();
 
         var settings = AppSettings.LoadOrCreateDefault();
         var logDirectory = Path.Combine(Path.GetDirectoryName(AppSettings.DatabasePath)!, "logs");
@@ -46,7 +47,7 @@ public partial class App : System.Windows.Application
 
         _polling = new PollingService(
             _provider, db, _loggerFactory.CreateLogger<PollingService>(),
-            TimeSpan.FromSeconds(Math.Max(1, settings.PollIntervalSeconds)));
+            TimeSpan.FromSeconds(Math.Max(5, settings.PollIntervalSeconds)));
 
         _mainWindow = new MainWindow();
         _tray = new TrayIconService(_mainWindow);
@@ -57,7 +58,7 @@ public partial class App : System.Windows.Application
 
         _polling.PollFailed += ex => _loggerFactory.CreateLogger<App>().LogError(ex, "Odpytywanie nieudane.");
 
-        _mainWindow.Show();
+        // Start hidden in the tray - the window opens only when the user asks for it (tray menu/double-click).
         _polling.Start();
     }
 
