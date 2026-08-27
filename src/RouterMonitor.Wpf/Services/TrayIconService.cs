@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Windows;
 using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
@@ -17,7 +16,9 @@ public sealed class TrayIconService : IDisposable
     {
         _mainWindow = mainWindow;
 
-        var icon = Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location)
+        // Assembly.Location is empty in a single-file publish - use the actual running exe path instead.
+        var exePath = Environment.ProcessPath;
+        var icon = (exePath is not null ? Drawing.Icon.ExtractAssociatedIcon(exePath) : null)
             ?? Drawing.SystemIcons.Application;
 
         var menu = new Forms.ContextMenuStrip();
