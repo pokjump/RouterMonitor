@@ -207,6 +207,161 @@
                 <Setter Property="Background" Value="{StaticResource Brush.Window}" />
             </Style>
 
+            <!-- Calendar popup (DatePicker) -->
+            <Style TargetType="Calendar">
+                <Setter Property="Background" Value="{StaticResource Brush.Panel}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}" />
+            </Style>
+
+            <Style TargetType="CalendarButton">
+                <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="CalendarButton">
+                            <Border x:Name="Bg" Background="Transparent" CornerRadius="3" Margin="2">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6,8" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.ControlHover}" />
+                                </Trigger>
+                                <Trigger Property="IsInactive" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="CalendarDayButton">
+                <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="CalendarDayButton">
+                            <Border x:Name="Bg" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="3" Margin="1">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.ControlHover}" />
+                                </Trigger>
+                                <Trigger Property="IsToday" Value="True">
+                                    <Setter TargetName="Bg" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                                </Trigger>
+                                <Trigger Property="IsInactive" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+                                    <Setter Property="Opacity" Value="0.6" />
+                                </Trigger>
+                                <Trigger Property="IsBlackedOut" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+                                    <Setter Property="Opacity" Value="0.35" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.Selection}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="CalendarNavButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="3">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.ControlHover}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.3" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="CalendarHeaderButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="3" Padding="6,3">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource Brush.ControlHover}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="CalendarItem">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="CalendarItem">
+                            <Border Background="{StaticResource Brush.Panel}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="6">
+                                <Grid Margin="6">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <Grid x:Name="PART_HeaderPanel" Grid.Row="0" Margin="2,2,2,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="PART_PreviousButton" Grid.Column="0" Content="&lt;" Style="{StaticResource CalendarNavButtonStyle}" />
+                                        <Button x:Name="PART_HeaderButton" Grid.Column="1" HorizontalAlignment="Center" Style="{StaticResource CalendarHeaderButtonStyle}" />
+                                        <Button x:Name="PART_NextButton" Grid.Column="2" Content="&gt;" Style="{StaticResource CalendarNavButtonStyle}" />
+                                    </Grid>
+
+                                    <Grid x:Name="PART_MonthView" Grid.Row="1" Margin="2" Visibility="Visible">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="*" />
+                                            <RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                    </Grid>
+
+                                    <Grid x:Name="PART_YearView" Grid.Row="1" Margin="2" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>
