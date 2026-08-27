@@ -34,6 +34,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RetryNowCommand))]
     private bool isRetrying;
+    [ObservableProperty] private bool isConnecting = true;
+    [ObservableProperty] private int connectionProgress;
+    [ObservableProperty] private string connectionStageText = "Łączenie z routerem...";
     [ObservableProperty] private DateTime historyDate = DateTime.Today.AddDays(-1);
 
     public ObservableCollection<NetworkDevice> Devices { get; } = [];
@@ -57,6 +60,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _polling.PollFailed += OnPollFailed;
         _polling.DevicesConnected += OnDevicesConnected;
         _polling.DevicesDisconnected += OnDevicesDisconnected;
+        _polling.ConnectionProgressChanged += OnConnectionProgressChanged;
 
         _ = LoadHistoryAsync();
         _ = LoadInactiveDevicesAsync();
@@ -109,6 +113,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             IsOnline = false;
             StatusMessage = $"Błąd połączenia: {ex.Message}";
+            IsConnecting = false;
+            ConnectionProgress = 0;
+        });
+    }
+
+    /// <summary>
+    /// Reflects the real steps of a poll (login/overview/devices/persist), not a fake animation.
+    /// Only surfaced while there's an actual connection attempt in flight - the initial connect,
+    /// or an explicit user-triggered retry - so it doesn't flash on every steady-state background poll.
+    /// </summary>
+    private void OnConnectionProgressChanged(int percent, string message)
+    {
+        System.Windows.Application.Current!.Dispatcher.Invoke(() =>
+        {
+            if (IsOnline && !IsRetrying)
+                return;
+
+            ConnectionProgress = percent;
+            ConnectionStageText = message;
+            IsConnecting = percent < 100;
         });
     }
 
@@ -146,6 +170,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task RetryNowAsync()
     {
         IsRetrying = true;
+        IsConnecting = true;
+        ConnectionProgress = 0;
         StatusMessage = "Ponawianie połączenia...";
         try
         {
@@ -282,5 +308,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _polling.PollFailed -= OnPollFailed;
         _polling.DevicesConnected -= OnDevicesConnected;
         _polling.DevicesDisconnected -= OnDevicesDisconnected;
+        _polling.ConnectionProgressChanged -= OnConnectionProgressChanged;
     }
 }

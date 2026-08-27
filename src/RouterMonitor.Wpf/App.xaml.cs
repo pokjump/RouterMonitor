@@ -23,7 +23,12 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+#if !DEBUG
+        // Debug builds run from bin/Debug during development and get rebuilt/cleaned constantly -
+        // registering that ephemeral path for Windows sign-in would silently hijack the autostart
+        // entry away from the real installed build and break it the next time bin/Debug changes.
         StartupRegistration.EnsureRegistered();
+#endif
 
         var settings = AppSettings.LoadOrCreateDefault();
         var logDirectory = Path.Combine(Path.GetDirectoryName(AppSettings.DatabasePath)!, "logs");

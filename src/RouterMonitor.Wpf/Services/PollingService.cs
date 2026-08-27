@@ -28,6 +28,12 @@ public sealed class PollingService : IAsyncDisposable
     public event Action<IReadOnlyList<DeviceStatusChange>>? DevicesConnected;
     public event Action<IReadOnlyList<NetworkDevice>>? DevicesDisconnected;
 
+    /// <summary>
+    /// Fired as each real step of a poll completes (login/overview fetch/device fetch/persist),
+    /// so the UI can drive an actual progress bar instead of a fake animated one.
+    /// </summary>
+    public event Action<int, string>? ConnectionProgressChanged;
+
     public PollingService(IRouterProvider provider, HistoryDatabase db, ILogger<PollingService> logger, TimeSpan interval)
     {
         _provider = provider;
@@ -135,15 +141,21 @@ public sealed class PollingService : IAsyncDisposable
     {
         try
         {
+            ConnectionProgressChanged?.Invoke(10, "Łączenie z routerem...");
             var overview = await _provider.GetOverviewAsync(cancellationToken);
+
+            ConnectionProgressChanged?.Invoke(55, "Pobieranie listy urządzeń...");
             var devices = await _provider.GetDevicesAsync(cancellationToken);
             var now = DateTimeOffset.Now;
 
             var downstream = NumericParsing.ExtractLeadingNumber(overview.Find("transfer pobiera", "downstream", "download"));
             var upstream = NumericParsing.ExtractLeadingNumber(overview.Find("transfer wysył", "upstream", "upload"));
-            await _db.RecordTransferSampleAsync(now, overview.Uptime, downstream, upstream, cancellationToken);
 
+            ConnectionProgressChanged?.Invoke(80, "Zapisywanie danych...");
+            await _db.RecordTransferSampleAsync(now, overview.Uptime, downstream, upstream, cancellationToken);
             var newMacs = await _db.RecordDeviceSightingsAsync(now, devices, cancellationToken);
+
+            ConnectionProgressChanged?.Invoke(100, "Połączono");
 
             DataUpdated?.Invoke(overview, devices);
             RaiseConnectivityChanges(devices, newMacs);

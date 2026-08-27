@@ -2,6 +2,7 @@
 bin/
 obj/
 gotowa-aplikacja/
+publish/
 
 ## VS / VS Code / Rider
 .vs/
