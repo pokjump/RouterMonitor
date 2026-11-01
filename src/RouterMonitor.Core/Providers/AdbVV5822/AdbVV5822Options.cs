@@ -30,6 +30,15 @@ public sealed record AdbVV5822Options
 
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Per-attempt timeout for <see cref="HomenetPath"/> (and the delete-host action, which
+    /// re-renders the same page). That page lists every device the router has ever seen, and
+    /// the router renders it slowly - roughly linearly in that list's length (~11 s with 35
+    /// known devices). The regular <see cref="Timeout"/> was eventually exceeded on every poll
+    /// once the list grew, so device fetches failed permanently while the overview still loaded.
+    /// </summary>
+    public TimeSpan HomenetTimeout { get; init; } = TimeSpan.FromSeconds(60);
+
     public int MaxRetries { get; init; } = 3;
 
     /// <summary>When set, every fetched page is saved here as a timestamped .html file for parser debugging.</summary>

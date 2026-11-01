@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using RouterMonitor.Core.Http;
@@ -105,7 +106,8 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
     public async Task DeleteDeviceAsync(int hostId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Usuwanie urządzenia (hostid={HostId}) z listy znanych urządzeń.", hostId);
-        var html = await GetHtmlEnsureSessionAsync($"{_options.HomenetPath}?action=delhost&hostid={hostId}", cancellationToken);
+        var html = await GetHtmlEnsureSessionAsync(
+            $"{_options.HomenetPath}?action=delhost&hostid={hostId}", cancellationToken, _options.HomenetTimeout);
         DumpIfEnabled(html, $"delhost-{hostId}");
     }
 
@@ -146,8 +148,18 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
 
     private async Task<IReadOnlyList<NetworkDevice>> GetHomenetDevicesAsync(CancellationToken cancellationToken)
     {
-        var html = await GetHtmlEnsureSessionAsync(_options.HomenetPath, cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
+        var html = await GetHtmlEnsureSessionAsync(_options.HomenetPath, cancellationToken, _options.HomenetTimeout);
         DumpIfEnabled(html, "homenet");
+
+        // Leave a trail before this page creeps up on its timeout again (it slows down as the
+        // router's known-device list grows) - deleting inactive devices speeds it back up.
+        if (stopwatch.Elapsed > _options.HomenetTimeout / 2)
+        {
+            _logger.LogWarning(
+                "Strona {Path} generowała się {Seconds:0.0} s (limit {Limit:0} s) - router wolno renderuje długą listę znanych urządzeń; usunięcie nieaktywnych urządzeń ją przyspieszy.",
+                _options.HomenetPath, stopwatch.Elapsed.TotalSeconds, _options.HomenetTimeout.TotalSeconds);
+        }
 
         var blocks = HomenetPageParser.ParseDeviceBlocks(html);
         if (blocks.Count == 0)
@@ -200,17 +212,17 @@ public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
         return sections;
     }
 
-    private async Task<string> GetHtmlEnsureSessionAsync(string path, CancellationToken cancellationToken)
+    private async Task<string> GetHtmlEnsureSessionAsync(string path, CancellationToken cancellationToken, TimeSpan? timeout = null)
     {
         await EnsureLoggedInAsync(cancellationToken);
 
-        var html = await _http.GetHtmlAsync(path, cancellationToken);
+        var html = await _http.GetHtmlAsync(path, cancellationToken, timeout);
         if (!LooksLikeLoginPage(html))
             return html;
 
         _logger.LogWarning("Sesja wygasła podczas pobierania {Path} - logowanie ponowne.", path);
         await ForceLoginAsync(cancellationToken);
-        return await _http.GetHtmlAsync(path, cancellationToken);
+        return await _http.GetHtmlAsync(path, cancellationToken, timeout);
     }
 
     /// <summary>
