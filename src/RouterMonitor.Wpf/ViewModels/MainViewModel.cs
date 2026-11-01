@@ -281,9 +281,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!confirmed)
             return;
 
+        // Each delete makes the router re-render its slow device list (several seconds apiece),
+        // so a bulk delete takes minutes - show live progress so the window doesn't look hung.
         var failures = 0;
-        foreach (var row in selected)
+        for (var i = 0; i < selected.Count; i++)
         {
+            var row = selected[i];
+            ManageStatusMessage = failures == 0
+                ? $"Usuwanie {i + 1}/{selected.Count}: {row.Name}... (router odpowiada wolno, to może potrwać kilka minut)"
+                : $"Usuwanie {i + 1}/{selected.Count}: {row.Name}... ({failures} nieudanych, patrz log)";
             try
             {
                 await _provider.DeleteDeviceAsync(row.Device.HostId!.Value);
@@ -295,11 +301,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
         }
 
-        ManageStatusMessage = failures == 0
+        var summary = failures == 0
             ? $"Usunięto {selected.Count} urządzeń."
             : $"Usunięto {selected.Count - failures} z {selected.Count} - {failures} nie powiodło się (patrz log).";
 
+        ManageStatusMessage = $"{summary} Odświeżanie listy...";
         await LoadInactiveDevicesAsync();
+
+        // LoadInactiveDevicesAsync overwrites the status line with its own count - keep the
+        // delete result visible unless the refresh itself failed (its error message wins then).
+        if (!ManageStatusMessage.StartsWith("Błąd", StringComparison.Ordinal))
+            ManageStatusMessage = $"{summary} {ManageStatusMessage}";
     }
 
     public void Dispose()
