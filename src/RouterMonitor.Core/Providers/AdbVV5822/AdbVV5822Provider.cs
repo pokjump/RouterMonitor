@@ -14,7 +14,7 @@ namespace RouterMonitor.Core.Providers.AdbVV5822;
 /// HTML parsed with <see cref="InfoFieldParser"/>. Login is a plain-text form POST (no
 /// hashing/nonce in this firmware), tracked via a cookie session.
 /// </summary>
-public sealed class AdbVV5822Provider : IRouterProvider, IDisposable
+public sealed partial class AdbVV5822Provider : IRouterProvider, IDisposable
 {
     private static readonly Regex PasswordInputRegex = new("""type\s*=\s*["']?password""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 

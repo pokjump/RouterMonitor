@@ -22,6 +22,7 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 - Periodically polls the router and shows the current download/upload rates as numbers.
 - Notifies via a system tray balloon whenever any device joins or leaves the network (not just the first time an unknown device shows up).
 - Starts hidden in the system tray and launches automatically at Windows sign-in.
+- Per-device speed limits ("Limity" tab, also on the phone): sets up the router's own QoS policers + traffic classification, so limits keep working when the PC is off. Download is matched on egress towards the LAN bridge (on WAN ingress the destination is still the public IP, pre-NAT). Entries are named `RM-<mac>-dl|ul`; the ISP's own QoS rules are never touched. If a limited device gets a new IP, the app moves its rules.
 - While running, serves a mobile-first web version on the LAN at `http://<this PC's IP>:1234` (dashboard, reboot, removing inactive devices). It's protected by a 6-digit PIN generated into `settings.json` (`WebPin`); the address and PIN are shown in the app's Zarządzanie tab. `WebServerEnabled` / `WebServerPort` turn it off or move it. Windows Firewall asks once to allow the app on the network.
 - Does not keep a history of which devices were online when - only the set of MACs ever seen, to tell new devices apart. Notifications show just the device name.
 - Data lives in `%AppData%\RouterMonitor` (`history.db`, `settings.json`, `logs\`); log files older than 7 days are deleted automatically.

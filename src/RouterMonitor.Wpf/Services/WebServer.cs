@@ -27,6 +27,7 @@ public sealed class WebServer : IAsyncDisposable
 
     private readonly IRouterProvider _provider;
     private readonly PollingService _polling;
+    private readonly RateLimitService _rateLimits;
     private readonly ILogger<WebServer> _logger;
     private readonly int _port;
     private readonly string _pin;
@@ -45,10 +46,11 @@ public sealed class WebServer : IAsyncDisposable
 
     private WebApplication? _app;
 
-    public WebServer(IRouterProvider provider, PollingService polling, int port, string pin, ILogger<WebServer> logger)
+    public WebServer(IRouterProvider provider, PollingService polling, RateLimitService rateLimits, int port, string pin, ILogger<WebServer> logger)
     {
         _provider = provider;
         _polling = polling;
+        _rateLimits = rateLimits;
         _port = port;
         _pin = pin;
         _logger = logger;
@@ -186,6 +188,53 @@ public sealed class WebServer : IAsyncDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Nie udało się wczytać nieaktywnych urządzeń (żądanie z telefonu).");
+                return Results.Json(new { error = ex.Message }, statusCode: 502);
+            }
+        });
+
+        app.MapGet("/api/limits", async (bool? refresh, CancellationToken ct) =>
+        {
+            try
+            {
+                if (refresh == true || !_rateLimits.IsLoaded)
+                    await _rateLimits.RefreshAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Nie udało się wczytać limitów prędkości (żądanie z telefonu).");
+                return Results.Json(new { error = ex.Message }, statusCode: 502);
+            }
+
+            return Results.Json(_rateLimits.GetEntries().Select(e => new
+            {
+                mac = e.Mac,
+                name = e.Name,
+                ip = e.IpAddress,
+                online = e.IsOnline,
+                downKbps = e.DownloadKbps,
+                upKbps = e.UploadKbps,
+            }));
+        });
+
+        app.MapPost("/api/limits", async (RateLimitRequest request, HttpContext context, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Mac)
+                || request.DownKbps is <= 0 or > 1_000_000
+                || request.UpKbps is <= 0 or > 1_000_000)
+            {
+                return Results.Json(new { error = "Nieprawidłowe dane limitu." }, statusCode: 400);
+            }
+
+            try
+            {
+                await _rateLimits.SetAsync(request.Mac, request.DownKbps, request.UpKbps, ct);
+                _logger.LogWarning("Limit prędkości z telefonu ({Ip}) dla {Mac}: pobieranie {Down} kbps, wysyłanie {Up} kbps.",
+                    context.Connection.RemoteIpAddress, request.Mac, request.DownKbps?.ToString() ?? "brak", request.UpKbps?.ToString() ?? "brak");
+                return Results.Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Nie udało się zmienić limitu prędkości dla {Mac} (żądanie z telefonu).", request.Mac);
                 return Results.Json(new { error = ex.Message }, statusCode: 502);
             }
         });
@@ -328,4 +377,6 @@ public sealed class WebServer : IAsyncDisposable
     }
 
     internal sealed record LoginRequest(string? Pin);
+
+    internal sealed record RateLimitRequest(string? Mac, int? DownKbps, int? UpKbps);
 }

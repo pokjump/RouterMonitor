@@ -119,6 +119,66 @@
                 </ScrollViewer>
             </TabItem>
 
+            <TabItem Header="Limity">
+                <DockPanel Margin="4">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,8,0,8">
+                        <TextBlock Text="Limity prędkości urządzeń" FontWeight="SemiBold" />
+                        <TextBlock Style="{StaticResource TileSubValue}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="Wpisz maksymalną prędkość w Mb/s (puste pole = bez limitu w tym kierunku) i kliknij Zapisz. Limit działa w routerze, także gdy ten komputer jest wyłączony. Zapis trwa 1–2 minuty, bo router odpowiada wolno." />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Odśwież" Command="{Binding RefreshRateLimitsCommand}" />
+                            <TextBlock Text="{Binding RateLimitStatus}" Style="{StaticResource TileSubValue}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="RateLimitList" ItemsSource="{Binding RateLimits}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource TileStyle}" Margin="0,0,0,8" HorizontalAlignment="Stretch">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Name}" Style="{StaticResource TileValue}" />
+                                                <TextBlock Text="{Binding Meta}" Style="{StaticResource TileSubValue}" />
+                                                <TextBlock Text="{Binding CurrentText}" Margin="0,4,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource TileSubValue}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasLimit}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Message}" Style="{StaticResource TileSubValue}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                                        IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}">
+                                                <TextBlock Text="↓" Style="{StaticResource TileValue}" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                <TextBox Text="{Binding DownloadText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LimitInput}" ToolTip="Pobieranie (Mb/s)" />
+                                                <TextBlock Text="↑" Style="{StaticResource TileValue}" Foreground="{StaticResource Brush.AccentAlt}" VerticalAlignment="Center" Margin="12,0,4,0" />
+                                                <TextBox Text="{Binding UploadText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource LimitInput}" ToolTip="Wysyłanie (Mb/s)" />
+                                                <TextBlock Text="Mb/s" Style="{StaticResource TileSubValue}" VerticalAlignment="Center" Margin="6,0,12,0" />
+                                                <Button Content="Zapisz" Margin="0,0,8,0"
+                                                        Command="{Binding DataContext.SaveRateLimitCommand, ElementName=RateLimitList}" CommandParameter="{Binding}" />
+                                                <Button Content="Usuń limit"
+                                                        Command="{Binding DataContext.RemoveRateLimitCommand, ElementName=RateLimitList}" CommandParameter="{Binding}"
+                                                        Visibility="{Binding HasLimit, Converter={StaticResource BoolToVis}}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+
             <TabItem Header="Zarządzanie">
                 <StackPanel Margin="4">
                     <TextBlock Text="Dostęp z telefonu" FontWeight="SemiBold" Margin="0,8,0,4" />

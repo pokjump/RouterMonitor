@@ -99,6 +99,23 @@
   .note { color: var(--muted); font-size: 13px; margin: 8px 0; }
   .msg { font-size: 13px; color: var(--muted); margin: 8px 0; min-height: 1.4em; }
 
+  /* Limits */
+  .limit { padding: 12px; border-top: 1px solid var(--border); }
+  .limit:first-child { border-top: 0; }
+  .limit-current { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .limit-current.on { color: var(--accent); font-weight: 600; }
+  .limit-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .limit-inputs label { font-size: 12px; color: var(--muted); display: block; }
+  .limit-inputs input {
+    width: 100%; height: 44px; margin-top: 4px; padding: 0 12px; font: inherit; font-size: 16px;
+    background: var(--control); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .limit-inputs input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .limit-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
+  .limit-actions.two { grid-template-columns: 1fr 1fr; }
+  .limit-msg { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .limit-msg.err { color: var(--danger); }
+
   /* Tab bar */
   nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
@@ -174,6 +191,14 @@
       <div id="devices" class="list"><div class="empty">Brak danych.</div></div>
     </section>
 
+    <section id="tab-limits" class="hidden">
+      <h2>Limity prędkości</h2>
+      <div class="note">Wpisz maksymalną prędkość w Mb/s (puste pole = bez limitu) i zapisz. Limit działa w routerze. Zapis trwa 1–2 minuty.</div>
+      <button id="limits-refresh" class="btn block">Odśwież</button>
+      <div id="limits-msg" class="msg"></div>
+      <div id="limits" class="list"><div class="empty">Wczytywanie...</div></div>
+    </section>
+
     <section id="tab-manage" class="hidden">
       <h2>Router</h2>
       <div class="tile">
@@ -200,6 +225,10 @@
     <button id="nav-dash" class="active" data-tab="dash">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       Pulpit
+    </button>
+    <button id="nav-limits" data-tab="limits">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      Limity
     </button>
     <button id="nav-manage" data-tab="manage">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -341,14 +370,143 @@
 
   // ---- Tabs ----
   function selectTab(name) {
-    $('tab-dash').classList.toggle('hidden', name !== 'dash');
-    $('tab-manage').classList.toggle('hidden', name !== 'manage');
-    $('nav-dash').classList.toggle('active', name === 'dash');
-    $('nav-manage').classList.toggle('active', name === 'manage');
+    ['dash', 'limits', 'manage'].forEach(t => {
+      $('tab-' + t).classList.toggle('hidden', name !== t);
+      $('nav-' + t).classList.toggle('active', name === t);
+    });
     window.scrollTo(0, 0);
     if (name === 'manage' && !inactiveLoaded) loadInactive();
+    if (name === 'limits' && !limitsLoaded) loadLimits(false);
   }
   document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+
+  // ---- Limits ----
+  let limitsLoaded = false;
+  let limitRows = [];          // [{ entry, el, busy, dirty }]
+  const fmtMbps = kbps => kbps == null ? '' : String(Math.round(kbps) / 1000).replace('.', ',');
+
+  function parseMbps(text) {
+    text = (text || '').trim();
+    if (!text) return { kbps: null };
+    const v = Number(text.replace(',', '.'));
+    if (!isFinite(v) || v <= 0 || v > 1000) return { error: '„' + text + '” to nie jest poprawna prędkość (np. 5 lub 2,5).' };
+    return { kbps: Math.round(v * 1000) };
+  }
+
+  function currentText(e) {
+    if (e.downKbps == null && e.upKbps == null) return 'Bez limitu';
+    return 'Limit: ↓ ' + (e.downKbps == null ? 'bez limitu' : fmtMbps(e.downKbps) + ' Mb/s')
+      + ' · ↑ ' + (e.upKbps == null ? 'bez limitu' : fmtMbps(e.upKbps) + ' Mb/s');
+  }
+
+  function buildLimitRow(row) {
+    const e = row.entry;
+    const box = el('div', 'limit');
+    const name = el('div', 'row-name', e.name);
+    const meta = el('div', 'row-meta', meta2(e));
+    const cur = el('div', 'limit-current');
+    const inputs = el('div', 'limit-inputs');
+    const mk = (label, value) => {
+      const l = el('label', null, label);
+      const i = el('input');
+      i.type = 'text'; i.inputMode = 'decimal'; i.placeholder = 'bez limitu'; i.value = value;
+      i.addEventListener('input', () => { row.dirty = true; });
+      l.append(i);
+      return [l, i];
+    };
+    const [dl, din] = mk('↓ Pobieranie (Mb/s)', fmtMbps(e.downKbps));
+    const [ul, uin] = mk('↑ Wysyłanie (Mb/s)', fmtMbps(e.upKbps));
+    inputs.append(dl, ul);
+    const actions = el('div', 'limit-actions');
+    const save = el('button', 'btn primary', 'Zapisz');
+    const remove = el('button', 'btn', 'Usuń limit');
+    actions.append(save, remove);
+    const msg = el('div', 'limit-msg');
+    box.append(name, meta, cur, inputs, actions, msg);
+    row.el = { box, name, meta, cur, din, uin, save, remove, actions, msg };
+
+    save.addEventListener('click', () => {
+      const d = parseMbps(din.value), u = parseMbps(uin.value);
+      const err = d.error || u.error;
+      if (err) { setRowMsg(row, err, true); return; }
+      changeLimit(row, d.kbps, u.kbps);
+    });
+    remove.addEventListener('click', () => {
+      if (!confirm('Usunąć limit dla ' + row.entry.name + '?')) return;
+      changeLimit(row, null, null);
+    });
+    updateLimitRow(row);
+    return box;
+  }
+
+  const meta2 = e => meta([e.ip, e.mac, e.online ? null : 'poza siecią']);
+
+  function updateLimitRow(row) {
+    const e = row.entry, x = row.el;
+    const has = e.downKbps != null || e.upKbps != null;
+    x.name.textContent = e.name;
+    x.meta.textContent = meta2(e);
+    x.cur.textContent = currentText(e);
+    x.cur.classList.toggle('on', has);
+    x.remove.classList.toggle('hidden', !has);
+    x.actions.classList.toggle('two', has);
+    if (!row.dirty) { x.din.value = fmtMbps(e.downKbps); x.uin.value = fmtMbps(e.upKbps); }
+    [x.din, x.uin, x.save, x.remove].forEach(c => c.disabled = row.busy);
+  }
+
+  function setRowMsg(row, text, isError) {
+    row.el.msg.textContent = text;
+    row.el.msg.classList.toggle('err', !!isError);
+  }
+
+  function renderLimits(entries) {
+    const old = new Map(limitRows.map(r => [r.entry.mac.toLowerCase(), r]));
+    limitRows = entries.map(e => {
+      const r = old.get(e.mac.toLowerCase());
+      if (r) { r.entry = e; updateLimitRow(r); return r; }
+      const nr = { entry: e, busy: false, dirty: false };
+      buildLimitRow(nr);
+      return nr;
+    });
+    // keep rows that are mid-save even if the list no longer has them
+    old.forEach(r => { if (r.busy && !limitRows.includes(r)) limitRows.push(r); });
+    const list = $('limits');
+    if (!limitRows.length) list.replaceChildren(el('div', 'empty', 'Brak urządzeń.'));
+    else list.replaceChildren(...limitRows.map(r => r.el.box));
+    const n = limitRows.filter(r => r.entry.downKbps != null || r.entry.upKbps != null).length;
+    $('limits-msg').textContent = n ? 'Limity ustawione dla ' + n + ' urządzeń.' : 'Żadne urządzenie nie ma limitu.';
+  }
+
+  async function loadLimits(refresh) {
+    $('limits-msg').textContent = 'Wczytywanie limitów z routera...';
+    $('limits-refresh').disabled = true;
+    try {
+      renderLimits(await api('/api/limits' + (refresh ? '?refresh=true' : '')));
+      limitsLoaded = true;
+    } catch (err) {
+      if (err instanceof Unauthorized) return showLogin();
+      $('limits-msg').textContent = 'Błąd wczytywania: ' + err.message;
+    } finally { $('limits-refresh').disabled = false; }
+  }
+
+  async function changeLimit(row, downKbps, upKbps) {
+    row.busy = true;
+    updateLimitRow(row);
+    setRowMsg(row, (downKbps == null && upKbps == null ? 'Usuwanie limitu...' : 'Zapisywanie w routerze...') + ' (to trwa 1–2 minuty)');
+    try {
+      await api('/api/limits', { method: 'POST', body: JSON.stringify({ mac: row.entry.mac, downKbps, upKbps }) });
+      row.dirty = false;
+      setRowMsg(row, downKbps == null && upKbps == null ? 'Limit usunięty.' : 'Zapisano.');
+    } catch (err) {
+      if (err instanceof Unauthorized) { row.busy = false; return showLogin(); }
+      setRowMsg(row, 'Błąd: ' + err.message, true);
+    } finally {
+      row.busy = false;
+      await loadLimits(false);
+    }
+  }
+
+  $('limits-refresh').addEventListener('click', () => loadLimits(true));
 
   // ---- Management ----
   $('reboot').addEventListener('click', async () => {

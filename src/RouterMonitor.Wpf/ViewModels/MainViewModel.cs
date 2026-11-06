@@ -14,6 +14,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IRouterProvider _provider;
     private readonly PollingService _polling;
     private readonly TrayIconService _tray;
+    private readonly RateLimitService _rateLimits;
     private readonly ILogger<MainViewModel> _logger;
 
     [ObservableProperty] private string model = "–";
@@ -39,15 +40,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<ManagedDeviceRow> InactiveDevices { get; } = [];
 
     [ObservableProperty] private string manageStatusMessage = "";
+    public ObservableCollection<RateLimitRow> RateLimits { get; } = [];
+    [ObservableProperty] private string rateLimitStatus = "Wczytywanie limitów z routera...";
+
     [ObservableProperty] private string webAccessUrl = "–";
     [ObservableProperty] private string webAccessPin = "–";
     [ObservableProperty] private string webAccessStatus = "Uruchamianie...";
 
-    public MainViewModel(IRouterProvider provider, PollingService polling, TrayIconService tray, ILogger<MainViewModel> logger)
+    public MainViewModel(IRouterProvider provider, PollingService polling, TrayIconService tray, RateLimitService rateLimits, ILogger<MainViewModel> logger)
     {
         _provider = provider;
         _polling = polling;
         _tray = tray;
+        _rateLimits = rateLimits;
+        _rateLimits.Changed += OnRateLimitsChanged;
         _logger = logger;
 
         _polling.DataUpdated += OnDataUpdated;
@@ -281,6 +287,108 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ManageStatusMessage = $"{summary} {ManageStatusMessage}";
     }
 
+    private void OnRateLimitsChanged()
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(SyncRateLimitRows);
+    }
+
+    /// <summary>Updates rows in place (by MAC) so typed-in values and per-row busy states survive background refreshes.</summary>
+    private void SyncRateLimitRows()
+    {
+        var entries = _rateLimits.GetEntries();
+        var byMac = RateLimits.ToDictionary(r => r.Mac, StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (byMac.Remove(entry.Mac, out var row))
+            {
+                row.Update(entry);
+                var current = RateLimits.IndexOf(row);
+                if (current != i)
+                    RateLimits.Move(current, i);
+            }
+            else
+            {
+                RateLimits.Insert(i, new RateLimitRow(entry));
+            }
+        }
+
+        foreach (var stale in byMac.Values.Where(r => !r.IsBusy))
+            RateLimits.Remove(stale);
+
+        if (_rateLimits.IsLoaded && !RateLimitStatus.StartsWith("Błąd", StringComparison.Ordinal))
+        {
+            var count = RateLimits.Count(r => r.HasLimit);
+            RateLimitStatus = count == 0 ? "Żadne urządzenie nie ma limitu." : $"Limity ustawione dla {count} urządzeń.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task RefreshRateLimitsAsync()
+    {
+        RateLimitStatus = "Wczytywanie limitów z routera...";
+        try
+        {
+            await _rateLimits.RefreshAsync();
+            RateLimitStatus = "";
+            SyncRateLimitRows();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Nie udało się wczytać limitów prędkości.");
+            RateLimitStatus = $"Błąd wczytywania limitów: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task SaveRateLimitAsync(RateLimitRow? row)
+    {
+        if (row is null || row.IsBusy)
+            return;
+
+        if (!RateLimitRow.TryParseMbps(row.DownloadText, out var down, out var error)
+            || !RateLimitRow.TryParseMbps(row.UploadText, out var up, out error))
+        {
+            row.Message = error!;
+            return;
+        }
+
+        await ChangeRateLimitAsync(row, down, up, down is null && up is null ? "Usuwanie limitu..." : "Zapisywanie w routerze...");
+    }
+
+    [RelayCommand]
+    private async Task RemoveRateLimitAsync(RateLimitRow? row)
+    {
+        if (row is null || row.IsBusy)
+            return;
+        await ChangeRateLimitAsync(row, null, null, "Usuwanie limitu...");
+    }
+
+    private async Task ChangeRateLimitAsync(RateLimitRow row, int? down, int? up, string busyText)
+    {
+        row.IsBusy = true;
+        row.Message = busyText + " (router odpowiada wolno, to trwa 1–2 minuty)";
+        try
+        {
+            await _rateLimits.SetAsync(row.Mac, down, up);
+            row.ResetEdits();
+            row.Message = down is null && up is null ? "Limit usunięty." : "Zapisano.";
+            _logger.LogWarning("Limit prędkości dla {Name} ({Mac}): pobieranie {Down} kbps, wysyłanie {Up} kbps.",
+                row.Name, row.Mac, down?.ToString() ?? "brak", up?.ToString() ?? "brak");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Nie udało się zmienić limitu prędkości dla {Name} ({Mac}).", row.Name, row.Mac);
+            row.Message = $"Błąd: {ex.Message}";
+        }
+        finally
+        {
+            row.IsBusy = false;
+            SyncRateLimitRows();
+        }
+    }
+
     public void SetWebAccess(string? url, string? pin, string status)
     {
         WebAccessUrl = url ?? "–";
@@ -295,5 +403,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _polling.DevicesConnected -= OnDevicesConnected;
         _polling.DevicesDisconnected -= OnDevicesDisconnected;
         _polling.ConnectionProgressChanged -= OnConnectionProgressChanged;
+        _rateLimits.Changed -= OnRateLimitsChanged;
     }
 }

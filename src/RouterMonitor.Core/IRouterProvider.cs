@@ -28,5 +28,17 @@ public interface IRouterProvider
     /// <summary>Reboots the router. The session will be invalid afterwards since the device restarts.</summary>
     Task RebootAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Per-device speed limits this app has set up in the router (its own QoS entries only).</summary>
+    Task<IReadOnlyList<DeviceRateLimit>> GetRateLimitsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates or updates the speed limit for the device with <paramref name="mac"/>, matched by its
+    /// current <paramref name="ipAddress"/>. A null rate removes the limit in that direction.
+    /// </summary>
+    Task SetRateLimitAsync(string mac, string ipAddress, int? downloadKbps, int? uploadKbps, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes every speed-limit entry this app created for the device.</summary>
+    Task RemoveRateLimitAsync(string mac, CancellationToken cancellationToken = default);
+
     Task LogoutAsync(CancellationToken cancellationToken = default);
 }

@@ -59,7 +59,8 @@ public partial class App : System.Windows.Application
         _tray = new TrayIconService(_mainWindow);
         _tray.ExitRequested += OnTrayExitRequested;
 
-        var viewModel = new MainViewModel(_provider, _polling, _tray, _loggerFactory.CreateLogger<MainViewModel>());
+        var rateLimits = new RateLimitService(_provider, _polling, _loggerFactory.CreateLogger<RateLimitService>());
+        var viewModel = new MainViewModel(_provider, _polling, _tray, rateLimits, _loggerFactory.CreateLogger<MainViewModel>());
         _mainWindow.DataContext = viewModel;
 
         _polling.PollFailed += ex => _loggerFactory.CreateLogger<App>().LogError(ex, "Odpytywanie nieudane.");
@@ -67,10 +68,10 @@ public partial class App : System.Windows.Application
         // Start hidden in the tray - the window opens only when the user asks for it (tray menu/double-click).
         _polling.Start();
 
-        await StartWebServerAsync(settings, viewModel);
+        await StartWebServerAsync(settings, viewModel, rateLimits);
     }
 
-    private async Task StartWebServerAsync(AppSettings settings, MainViewModel viewModel)
+    private async Task StartWebServerAsync(AppSettings settings, MainViewModel viewModel, RateLimitService rateLimits)
     {
         if (!settings.WebServerEnabled)
         {
@@ -79,7 +80,7 @@ public partial class App : System.Windows.Application
         }
 
         var pin = settings.WebPin!;
-        _webServer = new WebServer(_provider!, _polling!, settings.WebServerPort, pin, _loggerFactory!.CreateLogger<WebServer>());
+        _webServer = new WebServer(_provider!, _polling!, rateLimits, settings.WebServerPort, pin, _loggerFactory!.CreateLogger<WebServer>());
         try
         {
             await _webServer.StartAsync();
