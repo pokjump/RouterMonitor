@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F172A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Router Monitor</title>
+<style>
+  :root {
+    --bg: #0F172A;
+    --panel: #1E293B;
+    --panel-alt: #243247;
+    --border: #334155;
+    --text: #E5E7EB;
+    --muted: #94A3B8;
+    --accent: #3B82F6;
+    --accent-alt: #EC4899;
+    --danger: #EF4444;
+    --danger-strong: #DC2626;
+    --accent-strong: #2563EB;
+    --success: #22C55E;
+    --bar: #0B1220;
+    --control: #273449;
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+  button { font: inherit; color: inherit; }
+  .hidden { display: none !important; }
+
+  /* Header */
+  header {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--bar);
+    border-bottom: 1px solid var(--border);
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); flex: none; }
+  .dot.on { background: var(--success); }
+  .head-text { flex: 1; min-width: 0; }
+  .head-title { font-weight: 600; }
+  .head-status { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .icon-btn {
+    min-width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--control); display: grid; place-items: center; padding: 0 12px; cursor: pointer;
+  }
+  .icon-btn:active { background: var(--panel-alt); }
+  .spin svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  main { padding: 16px; max-width: 960px; margin: 0 auto; }
+  h2 { font-size: 15px; font-weight: 600; margin: 20px 0 8px; }
+  h2:first-child { margin-top: 0; }
+
+  /* Tiles */
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px; min-width: 0;
+  }
+  .tile.wide { grid-column: 1 / -1; }
+  .label { font-size: 11px; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  .value { font-size: 17px; font-weight: 600; margin-top: 4px; overflow-wrap: anywhere; }
+  .sub { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .down .value { color: var(--accent); }
+  .up .value { color: var(--accent-alt); }
+
+  /* Lists */
+  .list { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .row { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
+  .row:first-child { border-top: 0; }
+  .row-main { flex: 1; min-width: 0; }
+  .row-name { font-weight: 600; overflow-wrap: anywhere; }
+  .row-meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .empty { padding: 16px 12px; color: var(--muted); }
+  label.row { cursor: pointer; }
+  input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; margin: 0; }
+
+  /* Buttons */
+  .btn {
+    min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--control); cursor: pointer; font-weight: 600;
+  }
+  .btn:active { background: var(--panel-alt); }
+  .btn:disabled { opacity: 0.5; }
+  .btn.danger { background: var(--danger-strong); border-color: var(--danger-strong); color: #fff; }
+  .btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+  .btn.block { width: 100%; }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .note { color: var(--muted); font-size: 13px; margin: 8px 0; }
+  .msg { font-size: 13px; color: var(--muted); margin: 8px 0; min-height: 1.4em; }
+
+  /* Tab bar */
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: var(--bar); border-top: 1px solid var(--border);
+    display: flex; padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button {
+    flex: 1; height: 56px; background: none; border: 0; color: var(--muted); font-weight: 600; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px;
+  }
+  nav button.active { color: var(--text); }
+  nav button.active svg { stroke: var(--accent); }
+
+  /* Login */
+  .login { max-width: 360px; margin: 12vh auto 0; padding: 0 16px; text-align: center; }
+  .login h1 { font-size: 22px; margin: 0 0 6px; }
+  .pin {
+    width: 100%; height: 56px; margin: 20px 0 12px; text-align: center; font-size: 26px; letter-spacing: 0.4em;
+    background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .pin:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .error { color: var(--danger); min-height: 1.4em; margin-top: 10px; font-size: 14px; }
+
+  /* Wider screens: more tile columns, devices as a table-like grid */
+  @media (min-width: 640px) {
+    .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .btn-row { display: flex; }
+  }
+  @media (min-width: 900px) {
+    .tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .tile.wide { grid-column: span 3; }
+  }
+</style>
+</head>
+<body>
+
+<section id="login" class="login hidden">
+  <h1>Router Monitor</h1>
+  <div class="note">Wpisz PIN widoczny w aplikacji na komputerze (zakładka Zarządzanie).</div>
+  <form id="login-form">
+    <input id="pin" class="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="12" aria-label="PIN">
+    <button class="btn primary block" type="submit">Zaloguj</button>
+  </form>
+  <div id="login-error" class="error"></div>
+</section>
+
+<div id="app" class="hidden">
+  <header>
+    <span id="dot" class="dot"></span>
+    <div class="head-text">
+      <div class="head-title">Router Monitor</div>
+      <div id="head-status" class="head-status">Łączenie...</div>
+    </div>
+    <button id="retry" class="icon-btn" aria-label="Odśwież teraz" title="Ponów teraz">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <section id="tab-dash">
+      <div class="tiles">
+        <div class="tile down"><div class="label">POBIERANIE</div><div class="value" id="downstream">–</div></div>
+        <div class="tile up"><div class="label">WYSYŁANIE</div><div class="value" id="upstream">–</div></div>
+        <div class="tile"><div class="label">CZAS PRACY</div><div class="value" id="uptime">–</div></div>
+        <div class="tile"><div class="label">DNS</div><div class="value" id="dns">–</div></div>
+        <div class="tile wide"><div class="label">WAN IP / BRAMA</div><div class="value" id="wanIp">–</div><div class="sub" id="gateway"></div></div>
+        <div class="tile wide"><div class="label">MODEL / FIRMWARE</div><div class="value" id="model">–</div><div class="sub" id="firmware"></div></div>
+      </div>
+
+      <div id="wifi" class="tiles" style="margin-top:10px"></div>
+
+      <h2>Urządzenia w sieci <span id="device-count" class="sub" style="display:inline"></span></h2>
+      <div id="devices" class="list"><div class="empty">Brak danych.</div></div>
+    </section>
+
+    <section id="tab-manage" class="hidden">
+      <h2>Router</h2>
+      <div class="tile">
+        <button id="reboot" class="btn danger block">Uruchom ponownie router</button>
+        <div class="note">Router zrestartuje się natychmiast - internet i WiFi będą niedostępne przez chwilę.</div>
+      </div>
+
+      <h2>Nieaktywne urządzenia</h2>
+      <div class="btn-row">
+        <button id="inactive-refresh" class="btn">Odśwież</button>
+        <button id="inactive-delete" class="btn danger">Usuń zaznaczone</button>
+        <button id="inactive-all" class="btn">Zaznacz wszystkie</button>
+        <button id="inactive-none" class="btn">Odznacz wszystkie</button>
+      </div>
+      <div id="inactive-msg" class="msg"></div>
+      <div id="inactive" class="list"><div class="empty">Wczytywanie...</div></div>
+
+      <h2>Ten telefon</h2>
+      <button id="logout" class="btn block">Wyloguj</button>
+    </section>
+  </main>
+
+  <nav>
+    <button id="nav-dash" class="active" data-tab="dash">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Pulpit
+    </button>
+    <button id="nav-manage" data-tab="manage">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      Zarządzanie
+    </button>
+  </nav>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const REFRESH_MS = 5000;
+  let refreshTimer = null;
+  let inactive = [];
+  let inactiveLoaded = false;
+  let deleting = false;
+
+  class Unauthorized extends Error {}
+
+  async function api(path, options = {}) {
+    const init = { credentials: 'same-origin', ...options, headers: { ...(options.headers || {}) } };
+    if (init.method === 'POST') {
+      init.headers['X-RouterMonitor'] = '1';
+      if (init.body !== undefined) init.headers['Content-Type'] = 'application/json';
+    }
+    const res = await fetch(path, init);
+    if (res.status === 401 && path !== '/api/login') throw new Unauthorized();
+    let data = null;
+    const text = await res.text();
+    if (text) { try { data = JSON.parse(text); } catch { data = null; } }
+    if (!res.ok) throw Object.assign(new Error((data && data.error) || ('HTTP ' + res.status)), { status: res.status });
+    return data;
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  const dash = v => (v === null || v === undefined || v === '') ? '–' : v;
+  const meta = parts => parts.filter(Boolean).join(' · ');
+
+  // ---- Login ----
+  function showLogin() {
+    stopRefresh();
+    $('app').classList.add('hidden');
+    $('login').classList.remove('hidden');
+    setTimeout(() => $('pin').focus(), 50);
+  }
+  function showApp() {
+    $('login').classList.add('hidden');
+    $('app').classList.remove('hidden');
+  }
+
+  $('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('login-error').textContent = '';
+    try {
+      await api('/api/login', { method: 'POST', body: JSON.stringify({ pin: $('pin').value }) });
+      $('pin').value = '';
+      start();
+    } catch (err) {
+      $('login-error').textContent = err.message;
+      $('pin').select();
+    }
+  });
+
+  $('logout').addEventListener('click', async () => {
+    try { await api('/api/logout', { method: 'POST' }); } catch {}
+    showLogin();
+  });
+
+  // ---- Dashboard ----
+  function renderState(s) {
+    $('dot').classList.toggle('on', !!s.online);
+    $('head-status').textContent = s.status + (s.lastUpdated ? ' · ' + s.lastUpdated : '');
+    $('downstream').textContent = dash(s.downstream);
+    $('upstream').textContent = dash(s.upstream);
+    $('uptime').textContent = dash(s.uptime);
+    $('dns').textContent = dash(s.dns);
+    $('wanIp').textContent = dash(s.wanIp);
+    $('gateway').textContent = s.gateway || '';
+    $('model').textContent = dash(s.model);
+    $('firmware').textContent = s.firmware || '';
+
+    const wifi = $('wifi');
+    wifi.replaceChildren(...(s.wifi || []).map(b => {
+      const t = el('div', 'tile');
+      t.append(el('div', 'label', b.title), el('div', 'value', dash(b.ssid)), el('div', 'sub', b.encryption || ''));
+      return t;
+    }));
+    wifi.classList.toggle('hidden', !(s.wifi && s.wifi.length));
+
+    const devices = s.devices || [];
+    $('device-count').textContent = devices.length ? '(' + devices.length + ')' : '';
+    const list = $('devices');
+    if (!devices.length) {
+      list.replaceChildren(el('div', 'empty', s.lastUpdated ? 'Brak urządzeń.' : 'Brak danych.'));
+    } else {
+      list.replaceChildren(...devices.map(d => {
+        const row = el('div', 'row');
+        const main = el('div', 'row-main');
+        main.append(el('div', 'row-name', d.name), el('div', 'row-meta', meta([d.ip, d.mac])), el('div', 'row-meta', d.connection || ''));
+        row.append(main);
+        return row;
+      }));
+    }
+  }
+
+  async function refresh() {
+    try {
+      renderState(await api('/api/state'));
+    } catch (err) {
+      if (err instanceof Unauthorized) return showLogin();
+      $('dot').classList.remove('on');
+      $('head-status').textContent = 'Brak połączenia z komputerem';
+    }
+  }
+  function startRefresh() {
+    stopRefresh();
+    refreshTimer = setInterval(() => { if (!document.hidden) refresh(); }, REFRESH_MS);
+  }
+  function stopRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && refreshTimer) refresh(); });
+
+  $('retry').addEventListener('click', async () => {
+    const btn = $('retry');
+    if (btn.classList.contains('spin')) return;
+    btn.classList.add('spin');
+    $('head-status').textContent = 'Ponawianie połączenia...';
+    try { renderState(await api('/api/retry', { method: 'POST' })); }
+    catch (err) { if (err instanceof Unauthorized) showLogin(); else $('head-status').textContent = 'Błąd: ' + err.message; }
+    finally { btn.classList.remove('spin'); }
+  });
+
+  // ---- Tabs ----
+  function selectTab(name) {
+    $('tab-dash').classList.toggle('hidden', name !== 'dash');
+    $('tab-manage').classList.toggle('hidden', name !== 'manage');
+    $('nav-dash').classList.toggle('active', name === 'dash');
+    $('nav-manage').classList.toggle('active', name === 'manage');
+    window.scrollTo(0, 0);
+    if (name === 'manage' && !inactiveLoaded) loadInactive();
+  }
+  document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+
+  // ---- Management ----
+  $('reboot').addEventListener('click', async () => {
+    if (!confirm('Na pewno zrestartować router? Internet i WiFi w domu będą chwilowo niedostępne.')) return;
+    const btn = $('reboot');
+    btn.disabled = true;
+    try {
+      await api('/api/reboot', { method: 'POST' });
+      alert('Router uruchamia się ponownie - połączenie wróci za chwilę.');
+    } catch (err) {
+      if (err instanceof Unauthorized) return showLogin();
+      alert('Nie udało się zrestartować routera: ' + err.message);
+    } finally { btn.disabled = false; }
+  });
+
+  function renderInactive() {
+    const list = $('inactive');
+    if (!inactive.length) {
+      list.replaceChildren(el('div', 'empty', 'Brak nieaktywnych urządzeń.'));
+      return;
+    }
+    list.replaceChildren(...inactive.map(d => {
+      const row = el('label', 'row');
+      const cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = d.selected;
+      cb.disabled = deleting;
+      cb.addEventListener('change', () => { d.selected = cb.checked; });
+      const main = el('div', 'row-main');
+      main.append(el('div', 'row-name', d.name), el('div', 'row-meta', meta([d.ip, d.mac, d.connection])));
+      row.append(cb, main);
+      return row;
+    }));
+  }
+
+  function setManageBusy(busy) {
+    deleting = busy;
+    ['inactive-refresh', 'inactive-delete', 'inactive-all', 'inactive-none'].forEach(id => $(id).disabled = busy);
+  }
+
+  async function loadInactive() {
+    $('inactive-msg').textContent = 'Wczytywanie... (router odpowiada wolno)';
+    $('inactive-refresh').disabled = true;
+    try {
+      const data = await api('/api/inactive');
+      inactive = data.map(d => ({ ...d, selected: true }));
+      inactiveLoaded = true;
+      $('inactive-msg').textContent = inactive.length ? 'Znaleziono ' + inactive.length + ' nieaktywnych urządzeń.' : '';
+      renderInactive();
+      return true;
+    } catch (err) {
+      if (err instanceof Unauthorized) { showLogin(); return false; }
+      $('inactive-msg').textContent = 'Błąd wczytywania: ' + err.message;
+      return false;
+    } finally { if (!deleting) $('inactive-refresh').disabled = false; }
+  }
+
+  $('inactive-refresh').addEventListener('click', loadInactive);
+  $('inactive-all').addEventListener('click', () => { inactive.forEach(d => d.selected = true); renderInactive(); });
+  $('inactive-none').addEventListener('click', () => { inactive.forEach(d => d.selected = false); renderInactive(); });
+
+  $('inactive-delete').addEventListener('click', async () => {
+    const selected = inactive.filter(d => d.selected);
+    if (!selected.length) { $('inactive-msg').textContent = 'Nie zaznaczono żadnego urządzenia do usunięcia.'; return; }
+    if (!confirm('Usunąć ' + selected.length + ' zaznaczonych nieaktywnych urządzeń z listy znanych urządzeń routera?')) return;
+
+    setManageBusy(true);
+    renderInactive();
+    let failures = 0;
+    for (let i = 0; i < selected.length; i++) {
+      const d = selected[i];
+      $('inactive-msg').textContent = 'Usuwanie ' + (i + 1) + '/' + selected.length + ': ' + d.name + '...'
+        + (failures ? ' (' + failures + ' nieudanych)' : ' (router odpowiada wolno, to może potrwać kilka minut)');
+      try { await api('/api/devices/' + d.hostId + '/delete', { method: 'POST' }); }
+      catch (err) {
+        if (err instanceof Unauthorized) { setManageBusy(false); return showLogin(); }
+        failures++;
+      }
+    }
+    setManageBusy(false);
+    const summary = failures === 0
+      ? 'Usunięto ' + selected.length + ' urządzeń.'
+      : 'Usunięto ' + (selected.length - failures) + ' z ' + selected.length + ' - ' + failures + ' nie powiodło się.';
+    $('inactive-msg').textContent = summary + ' Odświeżanie listy...';
+    if (await loadInactive()) $('inactive-msg').textContent = summary + ' ' + $('inactive-msg').textContent;
+  });
+
+  // ---- Boot ----
+  async function start() {
+    try {
+      renderState(await api('/api/state'));
+    } catch (err) {
+      if (err instanceof Unauthorized) return showLogin();
+    }
+    showApp();
+    startRefresh();
+  }
+  start();
+})();
+</script>
+</body>
+</html>

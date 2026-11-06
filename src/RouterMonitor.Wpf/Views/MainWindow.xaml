@@ -121,7 +121,20 @@
 
             <TabItem Header="Zarządzanie">
                 <StackPanel Margin="4">
-                    <TextBlock Text="Router" FontWeight="SemiBold" Margin="0,8,0,4" />
+                    <TextBlock Text="Dostęp z telefonu" FontWeight="SemiBold" Margin="0,8,0,4" />
+                    <Border Style="{StaticResource TileStyle}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="ADRES" Style="{StaticResource TileLabel}" />
+                            <TextBox Text="{Binding WebAccessUrl, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                     Foreground="{StaticResource Brush.TextPrimary}" FontSize="16" FontWeight="SemiBold" Padding="0" />
+                            <TextBlock Text="PIN" Style="{StaticResource TileLabel}" Margin="0,8,0,0" />
+                            <TextBox Text="{Binding WebAccessPin, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                     Foreground="{StaticResource Brush.TextPrimary}" FontSize="16" FontWeight="SemiBold" Padding="0" />
+                            <TextBlock Text="{Binding WebAccessStatus}" Style="{StaticResource TileSubValue}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="Router" FontWeight="SemiBold" Margin="0,0,0,4" />
                     <Border Style="{StaticResource TileStyle}" Margin="0,0,0,16">
                         <StackPanel Orientation="Horizontal">
                             <Button Content="Uruchom ponownie router" Command="{Binding RebootRouterCommand}"

@@ -17,6 +17,7 @@ public partial class App : System.Windows.Application
     private IRouterProvider? _provider;
     private PollingService? _polling;
     private TrayIconService? _tray;
+    private WebServer? _webServer;
     private MainWindow? _mainWindow;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -65,6 +66,37 @@ public partial class App : System.Windows.Application
 
         // Start hidden in the tray - the window opens only when the user asks for it (tray menu/double-click).
         _polling.Start();
+
+        await StartWebServerAsync(settings, viewModel);
+    }
+
+    private async Task StartWebServerAsync(AppSettings settings, MainViewModel viewModel)
+    {
+        if (!settings.WebServerEnabled)
+        {
+            viewModel.SetWebAccess(null, null, "Wyłączony w settings.json (WebServerEnabled).");
+            return;
+        }
+
+        var pin = settings.WebPin!;
+        _webServer = new WebServer(_provider!, _polling!, settings.WebServerPort, pin, _loggerFactory!.CreateLogger<WebServer>());
+        try
+        {
+            await _webServer.StartAsync();
+            var urls = _webServer.Urls;
+            viewModel.SetWebAccess(
+                urls.Count > 0 ? string.Join("   ", urls) : $"http://<adres tego komputera>:{settings.WebServerPort}",
+                pin,
+                "Działa - otwórz adres w przeglądarce telefonu podłączonego do tej samej sieci.");
+        }
+        catch (Exception ex)
+        {
+            _loggerFactory!.CreateLogger<App>().LogError(ex, "Nie udało się uruchomić serwera WWW na porcie {Port}.", settings.WebServerPort);
+            await _webServer.DisposeAsync();
+            _webServer = null;
+            viewModel.SetWebAccess(null, null,
+                $"Nie udało się uruchomić na porcie {settings.WebServerPort} (port zajęty?). Zmień WebServerPort w settings.json. Błąd: {ex.Message}");
+        }
     }
 
     private void OnTrayExitRequested()
@@ -83,6 +115,9 @@ public partial class App : System.Windows.Application
 
     protected override async void OnExit(ExitEventArgs e)
     {
+        if (_webServer is not null)
+            await _webServer.DisposeAsync();
+
         if (_polling is not null)
             await _polling.DisposeAsync();
 

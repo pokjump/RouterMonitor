@@ -39,6 +39,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<ManagedDeviceRow> InactiveDevices { get; } = [];
 
     [ObservableProperty] private string manageStatusMessage = "";
+    [ObservableProperty] private string webAccessUrl = "–";
+    [ObservableProperty] private string webAccessPin = "–";
+    [ObservableProperty] private string webAccessStatus = "Uruchamianie...";
 
     public MainViewModel(IRouterProvider provider, PollingService polling, TrayIconService tray, ILogger<MainViewModel> logger)
     {
@@ -276,6 +279,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // delete result visible unless the refresh itself failed (its error message wins then).
         if (!ManageStatusMessage.StartsWith("Błąd", StringComparison.Ordinal))
             ManageStatusMessage = $"{summary} {ManageStatusMessage}";
+    }
+
+    public void SetWebAccess(string? url, string? pin, string status)
+    {
+        WebAccessUrl = url ?? "–";
+        WebAccessPin = pin ?? "–";
+        WebAccessStatus = status;
     }
 
     public void Dispose()
