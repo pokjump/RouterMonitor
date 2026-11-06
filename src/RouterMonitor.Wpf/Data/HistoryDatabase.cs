@@ -6,9 +6,9 @@ using RouterMonitor.Core.Models;
 namespace RouterMonitor.Wpf.Data;
 
 /// <summary>
-/// SQLite-backed history: one row per poll for transfer/uptime, one row per device per poll
-/// for presence, and a running "first/last seen" table per MAC used both to answer "who was
-/// online yesterday" and to detect brand-new devices for alerting.
+/// SQLite-backed storage: one row per poll for transfer/uptime (the chart), plus a table of
+/// MACs ever seen, used only to tell a brand-new device apart from a returning one for alerting.
+/// Per-poll presence history ("who was online when") is deliberately not collected.
 /// </summary>
 public sealed class HistoryDatabase
 {
@@ -36,16 +36,7 @@ public sealed class HistoryDatabase
                 DownstreamKbps REAL,
                 UpstreamKbps REAL
             );
-            CREATE TABLE IF NOT EXISTS DeviceSightings (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Timestamp TEXT NOT NULL,
-                Mac TEXT NOT NULL,
-                Name TEXT,
-                IpAddress TEXT,
-                ConnectionType TEXT
-            );
-            CREATE INDEX IF NOT EXISTS IX_DeviceSightings_Timestamp ON DeviceSightings(Timestamp);
-            CREATE INDEX IF NOT EXISTS IX_DeviceSightings_Mac ON DeviceSightings(Mac);
+            DROP TABLE IF EXISTS DeviceSightings;
             CREATE TABLE IF NOT EXISTS KnownDevices (
                 Mac TEXT PRIMARY KEY,
                 Name TEXT,
@@ -101,10 +92,10 @@ public sealed class HistoryDatabase
     }
 
     /// <summary>
-    /// Records this poll's device list and upserts KnownDevices' first/last-seen timestamps.
+    /// Upserts this poll's devices into KnownDevices (no per-poll presence rows are kept).
     /// Returns the MACs that were never in KnownDevices before this call, for new-device alerting.
     /// </summary>
-    public async Task<IReadOnlyList<string>> RecordDeviceSightingsAsync(
+    public async Task<IReadOnlyList<string>> RegisterKnownDevicesAsync(
         DateTimeOffset timestamp, IReadOnlyList<NetworkDevice> devices, CancellationToken cancellationToken = default)
     {
         var newMacs = new List<string>();
@@ -117,25 +108,11 @@ public sealed class HistoryDatabase
         {
             if (string.IsNullOrWhiteSpace(device.MacAddress))
             {
-                _logger.LogWarning("Pominięto urządzenie '{Name}' bez adresu MAC - nie da się śledzić jego historii.", device.Name);
+                _logger.LogWarning("Pominięto urządzenie '{Name}' bez adresu MAC - nie da się rozpoznać, czy jest nowe.", device.Name);
                 continue;
             }
 
             var mac = device.MacAddress;
-
-            await using (var insert = connection.CreateCommand())
-            {
-                insert.Transaction = transaction;
-                insert.CommandText =
-                    "INSERT INTO DeviceSightings (Timestamp, Mac, Name, IpAddress, ConnectionType) " +
-                    "VALUES ($ts, $mac, $name, $ip, $conn)";
-                insert.Parameters.AddWithValue("$ts", timestamp.ToString("O"));
-                insert.Parameters.AddWithValue("$mac", mac);
-                insert.Parameters.AddWithValue("$name", (object?)device.Name ?? DBNull.Value);
-                insert.Parameters.AddWithValue("$ip", (object?)device.IpAddress ?? DBNull.Value);
-                insert.Parameters.AddWithValue("$conn", (object?)device.ConnectionType ?? DBNull.Value);
-                await insert.ExecuteNonQueryAsync(cancellationToken);
-            }
 
             bool alreadyKnown;
             await using (var check = connection.CreateCommand())
@@ -165,44 +142,5 @@ public sealed class HistoryDatabase
 
         await transaction.CommitAsync(cancellationToken);
         return newMacs;
-    }
-
-    /// <summary>Distinct devices seen within [from, to), for a "who was online yesterday" view.</summary>
-    public async Task<IReadOnlyList<DeviceSightingSummary>> GetDevicesSeenBetweenAsync(
-        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT Mac,
-                   (SELECT Name FROM DeviceSightings d2 WHERE d2.Mac = d.Mac AND d2.Timestamp >= $from AND d2.Timestamp < $to ORDER BY d2.Timestamp DESC LIMIT 1) AS Name,
-                   (SELECT IpAddress FROM DeviceSightings d2 WHERE d2.Mac = d.Mac AND d2.Timestamp >= $from AND d2.Timestamp < $to ORDER BY d2.Timestamp DESC LIMIT 1) AS IpAddress,
-                   (SELECT ConnectionType FROM DeviceSightings d2 WHERE d2.Mac = d.Mac AND d2.Timestamp >= $from AND d2.Timestamp < $to ORDER BY d2.Timestamp DESC LIMIT 1) AS ConnectionType,
-                   MIN(Timestamp) AS FirstSeen,
-                   MAX(Timestamp) AS LastSeen
-            FROM DeviceSightings d
-            WHERE Timestamp >= $from AND Timestamp < $to
-            GROUP BY Mac
-            ORDER BY LastSeen DESC
-            """;
-        command.Parameters.AddWithValue("$from", from.ToString("O"));
-        command.Parameters.AddWithValue("$to", to.ToString("O"));
-
-        var result = new List<DeviceSightingSummary>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            result.Add(new DeviceSightingSummary(
-                Mac: reader.GetString(0),
-                Name: reader.IsDBNull(1) ? null : reader.GetString(1),
-                IpAddress: reader.IsDBNull(2) ? null : reader.GetString(2),
-                ConnectionType: reader.IsDBNull(3) ? null : reader.GetString(3),
-                FirstSeenInRange: DateTimeOffset.Parse(reader.GetString(4)),
-                LastSeenInRange: DateTimeOffset.Parse(reader.GetString(5))));
-        }
-
-        return result;
     }
 }

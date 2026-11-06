@@ -22,6 +22,8 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 - Periodically polls the router and stores download/upload transfer history in a local SQLite database, shown as a chart.
 - Notifies via a system tray balloon whenever any device joins or leaves the network (not just the first time an unknown device shows up).
 - Starts hidden in the system tray and launches automatically at Windows sign-in.
+- Does not keep a history of which devices were online when - only the set of MACs ever seen, to tell new devices apart. Notifications show just the device name.
+- Data lives in `%AppData%\RouterMonitor` (`history.db`, `settings.json`, `logs\`); log files older than 7 days are deleted automatically.
 
 ## Repository layout
 

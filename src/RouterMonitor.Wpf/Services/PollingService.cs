@@ -153,7 +153,7 @@ public sealed class PollingService : IAsyncDisposable
 
             ConnectionProgressChanged?.Invoke(80, "Zapisywanie danych...");
             await _db.RecordTransferSampleAsync(now, overview.Uptime, downstream, upstream, cancellationToken);
-            var newMacs = await _db.RecordDeviceSightingsAsync(now, devices, cancellationToken);
+            var newMacs = await _db.RegisterKnownDevicesAsync(now, devices, cancellationToken);
 
             ConnectionProgressChanged?.Invoke(100, "Połączono");
 

@@ -5,7 +5,6 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using RouterMonitor.Core;
 using RouterMonitor.Core.Models;
-using RouterMonitor.Wpf.Data;
 using RouterMonitor.Wpf.Services;
 
 namespace RouterMonitor.Wpf.ViewModels;
@@ -16,7 +15,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private readonly IRouterProvider _provider;
     private readonly PollingService _polling;
-    private readonly HistoryDatabase _db;
     private readonly TrayIconService _tray;
     private readonly ILogger<MainViewModel> _logger;
 
@@ -37,22 +35,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool isConnecting = true;
     [ObservableProperty] private int connectionProgress;
     [ObservableProperty] private string connectionStageText = "Łączenie z routerem...";
-    [ObservableProperty] private DateTime historyDate = DateTime.Today.AddDays(-1);
 
     public ObservableCollection<NetworkDevice> Devices { get; } = [];
     public ObservableCollection<WifiBand> WifiBands { get; } = [];
     public ObservableCollection<double> DownstreamHistory { get; } = [];
     public ObservableCollection<double> UpstreamHistory { get; } = [];
-    public ObservableCollection<DeviceSightingSummary> HistoryDevices { get; } = [];
     public ObservableCollection<ManagedDeviceRow> InactiveDevices { get; } = [];
 
     [ObservableProperty] private string manageStatusMessage = "";
 
-    public MainViewModel(IRouterProvider provider, PollingService polling, HistoryDatabase db, TrayIconService tray, ILogger<MainViewModel> logger)
+    public MainViewModel(IRouterProvider provider, PollingService polling, TrayIconService tray, ILogger<MainViewModel> logger)
     {
         _provider = provider;
         _polling = polling;
-        _db = db;
         _tray = tray;
         _logger = logger;
 
@@ -62,7 +57,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _polling.DevicesDisconnected += OnDevicesDisconnected;
         _polling.ConnectionProgressChanged += OnConnectionProgressChanged;
 
-        _ = LoadHistoryAsync();
         _ = LoadInactiveDevicesAsync();
     }
 
@@ -142,7 +136,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             foreach (var (device, isNew) in changes)
             {
-                var message = $"{device.Name} ({device.MacAddress}) dołączył do sieci - IP {device.IpAddress ?? "?"}.";
+                var message = $"{device.Name} dołączył do sieci.";
                 _tray.ShowDeviceAlert(isNew ? "Nowe urządzenie w sieci" : "Urządzenie połączone", message);
                 _logger.LogWarning(
                     "Urządzenie połączone{New}: {Name} MAC={Mac} IP={Ip} Połączenie={Connection}",
@@ -157,7 +151,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             foreach (var device in devices)
             {
-                var message = $"{device.Name} ({device.MacAddress}) rozłączył się z siecią.";
+                var message = $"{device.Name} rozłączył się z siecią.";
                 _tray.ShowDeviceAlert("Urządzenie rozłączone", message);
                 _logger.LogWarning(
                     "Urządzenie rozłączone: {Name} MAC={Mac} Połączenie={Connection}",
@@ -184,18 +178,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private bool CanRetryNow() => !IsRetrying;
-
-    [RelayCommand]
-    private async Task LoadHistoryAsync()
-    {
-        var from = new DateTimeOffset(HistoryDate.Date, DateTimeOffset.Now.Offset);
-        var to = from.AddDays(1);
-        var results = await _db.GetDevicesSeenBetweenAsync(from, to);
-
-        HistoryDevices.Clear();
-        foreach (var result in results)
-            HistoryDevices.Add(result);
-    }
 
     [RelayCommand]
     private async Task RebootRouterAsync()

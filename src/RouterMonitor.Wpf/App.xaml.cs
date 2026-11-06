@@ -58,7 +58,7 @@ public partial class App : System.Windows.Application
         _tray = new TrayIconService(_mainWindow);
         _tray.ExitRequested += OnTrayExitRequested;
 
-        var viewModel = new MainViewModel(_provider, _polling, db, _tray, _loggerFactory.CreateLogger<MainViewModel>());
+        var viewModel = new MainViewModel(_provider, _polling, _tray, _loggerFactory.CreateLogger<MainViewModel>());
         _mainWindow.DataContext = viewModel;
 
         _polling.PollFailed += ex => _loggerFactory.CreateLogger<App>().LogError(ex, "Odpytywanie nieudane.");

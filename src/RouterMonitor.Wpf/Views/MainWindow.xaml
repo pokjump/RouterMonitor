@@ -131,28 +131,6 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="Historia">
-                <StackPanel Margin="4">
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,10">
-                        <TextBlock Text="Data:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <DatePicker SelectedDate="{Binding HistoryDate}" Width="140" />
-                        <Button Content="Odśwież" Margin="10,0,0,0" Command="{Binding LoadHistoryCommand}" />
-                    </StackPanel>
-                    <TextBlock Text="Kto był w sieci danego dnia" FontWeight="SemiBold" Margin="0,0,0,4" />
-                    <DataGrid ItemsSource="{Binding HistoryDevices}" AutoGenerateColumns="False" IsReadOnly="True"
-                              HeadersVisibility="Column" RowHeight="28">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Nazwa" Binding="{Binding Name}" Width="2*" />
-                            <DataGridTextColumn Header="Adres IP" Binding="{Binding IpAddress}" Width="1.2*" />
-                            <DataGridTextColumn Header="Adres MAC" Binding="{Binding Mac}" Width="1.5*" />
-                            <DataGridTextColumn Header="Połączenie" Binding="{Binding ConnectionType}" Width="1.5*" />
-                            <DataGridTextColumn Header="Pierwszy raz" Binding="{Binding FirstSeenInRange}" Width="1.3*" />
-                            <DataGridTextColumn Header="Ostatni raz" Binding="{Binding LastSeenInRange}" Width="1.3*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-            </TabItem>
-
             <TabItem Header="Zarządzanie">
                 <StackPanel Margin="4">
                     <TextBlock Text="Router" FontWeight="SemiBold" Margin="0,8,0,4" />
