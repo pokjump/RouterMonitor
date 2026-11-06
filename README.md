@@ -11,7 +11,7 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 1. To log in, the app fetches the router's login page and pulls out the nonce/codes the panel embeds in it (`AdbLoginPageParser`). The panel's own JavaScript (`login_onsubmit()`) hashes the password together with that nonce before submitting the form; `LoginHash`/`Md5Crypt` reimplement that same hashing in C#, so the app authenticates the way a browser would without ever sending the plaintext password.
 2. Once logged in, `RouterHttpClient` fetches the panel's HTML pages (device summary, home network, etc.), retrying failed requests with exponential backoff to work around the router's flaky connection.
 3. Each page is parsed with `InfoFieldParser`/`HomenetPageParser` (using HtmlAgilityPack). Since the panel has no structured API, everything - WAN status, Wi-Fi info, connected devices - is read straight out of the rendered HTML labels and values.
-4. In the WPF app, `PollingService` runs this login-fetch-parse cycle on a timer in the background, pushes the latest snapshot to the UI (`MainViewModel`), and writes it to a local SQLite database (`HistoryDatabase`) for the transfer chart and for spotting devices that weren't seen before.
+4. In the WPF app, `PollingService` runs this login-fetch-parse cycle on a timer in the background, pushes the latest snapshot to the UI (`MainViewModel`), and records each device's MAC in a local SQLite database (`HistoryDatabase`) to spot devices that weren't seen before.
 5. `PollingService` compares each poll's device list against the previous one; any device that joins or drops off the network triggers a Windows tray notification (`TrayIconService`) - not just devices never seen before. The app starts hidden in the tray (no window is shown at startup) and registers itself to launch at Windows sign-in.
 6. The console tool (`RouterMonitor.Console`) skips the UI and history entirely and just runs one login-fetch-print cycle - useful for scripting or a quick manual check.
 
@@ -19,7 +19,7 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 
 - Shows WAN/DSL connection status, IP addresses, Wi-Fi (SSID, security) and basic device info.
 - Lists devices connected to the home network (name, MAC address, IP address, interface).
-- Periodically polls the router and stores download/upload transfer history in a local SQLite database, shown as a chart.
+- Periodically polls the router and shows the current download/upload rates as numbers.
 - Notifies via a system tray balloon whenever any device joins or leaves the network (not just the first time an unknown device shows up).
 - Starts hidden in the system tray and launches automatically at Windows sign-in.
 - Does not keep a history of which devices were online when - only the set of MACs ever seen, to tell new devices apart. Notifications show just the device name.
@@ -28,7 +28,7 @@ The ADB VV5822 and its firmware (`VV5822_NETIA_7.6.0.0010`) are simply bad. The 
 ## Repository layout
 
 - `src/RouterMonitor.Core` - UI-independent logic: HTTP client with retry, login to the panel (reimplements the hashing from `login_onsubmit()`), HTML page parsers, data models.
-- `src/RouterMonitor.Wpf` - the desktop app (WPF) with a tray icon, SQLite-backed history, and a transfer chart.
+- `src/RouterMonitor.Wpf` - the desktop app (WPF) with a tray icon and a small SQLite database of known devices.
 - `src/RouterMonitor.Console` - a simple console tool for a one-off poll of the router that prints the result.
 
 ## Requirements

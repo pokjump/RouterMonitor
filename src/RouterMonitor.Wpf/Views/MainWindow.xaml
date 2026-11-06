@@ -1,7 +1,6 @@
 <Window x:Class="RouterMonitor.Wpf.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:controls="clr-namespace:RouterMonitor.Wpf.Controls"
         Title="Router Monitor" Height="720" Width="1080" MinHeight="560" MinWidth="820"
         Closing="OnWindowClosing"
         Background="{StaticResource Brush.Window}">
@@ -105,17 +104,6 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-
-                        <TextBlock Text="Transfer" FontWeight="SemiBold" Margin="0,4,0,4" />
-                        <Border Style="{StaticResource TileStyle}" Margin="0,0,0,10" Height="120">
-                            <controls:TransferChart Downstream="{Binding DownstreamHistory}" Upstream="{Binding UpstreamHistory}" />
-                        </Border>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,14">
-                            <Rectangle Width="10" Height="10" Fill="{StaticResource Brush.Accent}" Margin="0,0,4,0" />
-                            <TextBlock Text="Pobieranie" Margin="0,0,14,0" Style="{StaticResource TileSubValue}" />
-                            <Rectangle Width="10" Height="10" Fill="{StaticResource Brush.AccentAlt}" Margin="0,0,4,0" />
-                            <TextBlock Text="Wysyłanie" Style="{StaticResource TileSubValue}" />
-                        </StackPanel>
 
                         <TextBlock Text="Urządzenia w sieci" FontWeight="SemiBold" Margin="0,0,0,4" />
                         <DataGrid ItemsSource="{Binding Devices}" AutoGenerateColumns="False" IsReadOnly="True"

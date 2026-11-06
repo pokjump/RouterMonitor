@@ -11,8 +11,6 @@ namespace RouterMonitor.Wpf.ViewModels;
 
 public partial class MainViewModel : ObservableObject, IDisposable
 {
-    private const int MaxChartPoints = 60;
-
     private readonly IRouterProvider _provider;
     private readonly PollingService _polling;
     private readonly TrayIconService _tray;
@@ -38,8 +36,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<NetworkDevice> Devices { get; } = [];
     public ObservableCollection<WifiBand> WifiBands { get; } = [];
-    public ObservableCollection<double> DownstreamHistory { get; } = [];
-    public ObservableCollection<double> UpstreamHistory { get; } = [];
     public ObservableCollection<ManagedDeviceRow> InactiveDevices { get; } = [];
 
     [ObservableProperty] private string manageStatusMessage = "";
@@ -84,21 +80,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             foreach (var section in overview.Sections.Where(s => s.Title.Contains("wifi", StringComparison.OrdinalIgnoreCase)))
                 WifiBands.Add(WifiBand.FromSection(section));
 
-            PushChartPoint(
-                NumericParsing.ExtractLeadingNumber(DownstreamText),
-                NumericParsing.ExtractLeadingNumber(UpstreamText));
         });
-    }
-
-    private void PushChartPoint(double? downstream, double? upstream)
-    {
-        DownstreamHistory.Add(downstream ?? 0);
-        UpstreamHistory.Add(upstream ?? 0);
-
-        while (DownstreamHistory.Count > MaxChartPoints)
-            DownstreamHistory.RemoveAt(0);
-        while (UpstreamHistory.Count > MaxChartPoints)
-            UpstreamHistory.RemoveAt(0);
     }
 
     private void OnPollFailed(Exception ex)

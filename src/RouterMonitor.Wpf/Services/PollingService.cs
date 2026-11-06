@@ -148,11 +148,7 @@ public sealed class PollingService : IAsyncDisposable
             var devices = await _provider.GetDevicesAsync(cancellationToken);
             var now = DateTimeOffset.Now;
 
-            var downstream = NumericParsing.ExtractLeadingNumber(overview.Find("transfer pobiera", "downstream", "download"));
-            var upstream = NumericParsing.ExtractLeadingNumber(overview.Find("transfer wysył", "upstream", "upload"));
-
             ConnectionProgressChanged?.Invoke(80, "Zapisywanie danych...");
-            await _db.RecordTransferSampleAsync(now, overview.Uptime, downstream, upstream, cancellationToken);
             var newMacs = await _db.RegisterKnownDevicesAsync(now, devices, cancellationToken);
 
             ConnectionProgressChanged?.Invoke(100, "Połączono");
